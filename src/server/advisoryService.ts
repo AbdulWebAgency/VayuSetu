@@ -22,7 +22,6 @@ export async function buildAdvisory(req: AdvisoryRequest, deps: AdvisoryDeps): P
     const ai = await (deps.gemini ?? callGemini)(deps.geminiKey, SYSTEM_INSTRUCTION, buildUserPrompt(req.profile, data, baseline, req.location.name));
     return { air, advisory: guardAiAdvisory(ai, req.profile, baseline, data, now) };
   } catch (e) {
-    console.error("DEBUG GEMINI ERROR:", e);
     const reason = e instanceof UpstreamError && e.status === 429 ? "AI rate-limited" : e instanceof UpstreamError && e.reason === "schema" ? "AI output failed validation" : "AI unavailable";
     return { air, advisory: { ...baseline, modeReason: `${reason} — rule-based guidance` } };
   }

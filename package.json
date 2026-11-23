@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "vite build && node --input-type=module -e \"import fs from 'node:fs'; const f='.vercel/output/functions/__server.func/.vc-config.json'; if(fs.existsSync(f)){const c=JSON.parse(fs.readFileSync(f,'utf8')); c.regions=['bom1']; c.maxDuration=60; fs.writeFileSync(f,JSON.stringify(c,null,2));}\"",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
