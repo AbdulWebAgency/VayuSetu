@@ -70,8 +70,7 @@ function ventilation(c: RuleContext): string {
   return "Outdoor particle levels are lower right now: a 10–15 minute cross-ventilation window is reasonable, ideally away from road-facing sides.";
 }
 
-const rec = (r: Recommendation): Recommendation => r;
-const why = (c: RuleContext, extra: string): string => {
+const describeOutdoorEvidence = (c: RuleContext, extra: string): string => {
   const pm =
     c.usable && c.air?.pollutants.pm25 != null
       ? `Outdoor PM2.5 ${c.air.pollutants.pm25} µg/m³ (${c.basis.toLowerCase()})`
@@ -82,61 +81,57 @@ const why = (c: RuleContext, extra: string): string => {
 function routineRecs(c: RuleContext, p: HouseholdProfile): Recommendation[] {
   const out: Recommendation[] = [];
   const motor = p.commuteMode === "private_car" || p.commuteMode === "two_wheeler";
-  out.push(
-    rec({
-      id: "routine-commute",
-      pillar: "routines",
-      title: motor
-        ? "Shift or share the vehicle commute"
-        : p.commuteMode === "work_from_home"
-          ? "Keep remote-work days on high-smog days"
-          : "Plan the commute around peak smog",
-      what: motor
-        ? "Combine errands into one trip, carpool, or switch one commute leg to metro/bus; on a two-wheeler wear a well-fitted N95/FFP2 mask."
-        : p.commuteMode === "work_from_home"
-          ? "Schedule unavoidable outings for midday instead of early morning or late evening."
-          : "Travel slightly outside 8–10 am and 6–9 pm peaks where possible and choose routes away from arterial roads.",
-      why: why(
-        c,
-        `Commute: ${p.commuteMode.replace(/_/g, " ")}, ${p.commuteWindow.replace(/_/g, " ")}.`,
-      ),
-      how: "Winter inversions trap traffic emissions near the ground in early morning and late evening; fewer vehicle trips also cut what you add.",
-      limitation:
-        "Office hours, school timings and transit availability may not allow shifting; a mask only helps if it seals well.",
-      basis: c.basis,
-    }),
-  );
+  out.push({
+    id: "routine-commute",
+    pillar: "routines",
+    title: motor
+      ? "Shift or share the vehicle commute"
+      : p.commuteMode === "work_from_home"
+        ? "Keep remote-work days on high-smog days"
+        : "Plan the commute around peak smog",
+    what: motor
+      ? "Combine errands into one trip, carpool, or switch one commute leg to metro/bus; on a two-wheeler wear a well-fitted N95/FFP2 mask."
+      : p.commuteMode === "work_from_home"
+        ? "Schedule unavoidable outings for midday instead of early morning or late evening."
+        : "Travel slightly outside 8–10 am and 6–9 pm peaks where possible and choose routes away from arterial roads.",
+    why: describeOutdoorEvidence(
+      c,
+      `Commute: ${p.commuteMode.replace(/_/g, " ")}, ${p.commuteWindow.replace(/_/g, " ")}.`,
+    ),
+    how: "Winter inversions trap traffic emissions near the ground in early morning and late evening; fewer vehicle trips also cut what you add.",
+    limitation:
+      "Office hours, school timings and transit availability may not allow shifting; a mask only helps if it seals well.",
+    basis: c.basis,
+  });
   if (
     p.exerciseRoutine === "morning_outdoor" ||
     p.exerciseRoutine === "evening_outdoor" ||
     p.youngChildren
   ) {
-    out.push(
-      rec({
-        id: "routine-exercise",
-        pillar: "routines",
-        title: c.high
-          ? "Move outdoor exercise and play indoors today"
-          : "Time outdoor activity for the cleaner window",
-        what: c.high
-          ? "Replace outdoor runs or children's outdoor play with indoor activity until levels drop."
-          : "Prefer late morning to mid-afternoon for outdoor exercise or play, away from busy roads.",
-        why: why(
-          c,
-          `Routine: ${p.exerciseRoutine.replace(/_/g, " ")}${p.youngChildren ? "; young children present" : ""}.`,
-        ),
-        how: "Deeper breathing during exertion increases the amount of particles inhaled; children breathe more air per body weight.",
-        limitation: "Indoor alternatives may be less enjoyable; conditions vary block to block.",
-        basis: c.basis,
-      }),
-    );
+    out.push({
+      id: "routine-exercise",
+      pillar: "routines",
+      title: c.high
+        ? "Move outdoor exercise and play indoors today"
+        : "Time outdoor activity for the cleaner window",
+      what: c.high
+        ? "Replace outdoor runs or children's outdoor play with indoor activity until levels drop."
+        : "Prefer late morning to mid-afternoon for outdoor exercise or play, away from busy roads.",
+      why: describeOutdoorEvidence(
+        c,
+        `Routine: ${p.exerciseRoutine.replace(/_/g, " ")}${p.youngChildren ? "; young children present" : ""}.`,
+      ),
+      how: "Deeper breathing during exertion increases the amount of particles inhaled; children breathe more air per body weight.",
+      limitation: "Indoor alternatives may be less enjoyable; conditions vary block to block.",
+      basis: c.basis,
+    });
   }
   return out;
 }
 
 function indoorRecs(c: RuleContext, p: HouseholdProfile): Recommendation[] {
   const out: Recommendation[] = [
-    rec({
+    {
       id: "indoor-sources",
       pillar: "indoor",
       title: "Cut indoor smoke and combustion",
@@ -148,64 +143,62 @@ function indoorRecs(c: RuleContext, p: HouseholdProfile): Recommendation[] {
       how: "Removing sources is the most effective way to lower indoor particles.",
       limitation: "Exhausts need to vent outdoors to be effective; habits take time to change.",
       basis: c.indoor.status === "comparable" ? "Measured" : "Qualitative",
-    }),
-    rec({
+    },
+    {
       id: "indoor-ventilation",
       pillar: "indoor",
       title: "Time window ventilation",
       what: ventilation(c),
-      why: why(
+      why: describeOutdoorEvidence(
         c,
         "Ventilation timing depends on whether the stronger source is indoors or outdoors.",
       ),
       how: "Brief, targeted ventilation clears indoor fumes and humidity while limiting outdoor smog entry.",
       limitation: "Kitchens and bathrooms still need airflow to avoid moisture and gas build-up.",
       basis: c.basis,
-    }),
+    },
   ];
   out.push(
     p.hasAirPurifier
-      ? rec({
+      ? {
           id: "indoor-purifier",
           pillar: "indoor",
           title: "Run your HEPA purifier in the main room",
           what: "Run the purifier continuously in the room where the family spends most time (bedroom at night), doors closed, and check/replace the filter per manufacturer guidance.",
-          why: why(c, `Tier: ${c.tier} sensitivity.`),
+          why: describeOutdoorEvidence(c, `Tier: ${c.tier} sensitivity.`),
           how: "True HEPA filters capture most fine particles passing through; a closed room lets the unit keep up.",
           limitation:
             "Only effective if sized for the room (CADR) and the filter is maintained; does not remove gases.",
           basis: c.basis,
-        })
-      : rec({
+        }
+      : {
           id: "indoor-clean-room",
           pillar: "indoor",
           title: "Create one cleaner room without a purifier",
           what: "Pick one bedroom, keep its windows closed on high-smog days, seal obvious gaps, wet-mop and dust with a damp cloth. If you consider buying a HEPA purifier, choose one whose CADR suits the room size.",
-          why: why(c, `No purifier owned; tier: ${c.tier}.`),
+          why: describeOutdoorEvidence(c, `No purifier owned; tier: ${c.tier}.`),
           how: "Limiting infiltration and resuspended dust reduces particles where people sleep.",
           limitation: "Sealing reduces fresh air; a purifier is an added cost.",
           basis: "Qualitative",
-        }),
+        },
   );
-  out.push(
-    rec({
-      id: "indoor-plants",
-      pillar: "indoor",
-      title: "Treat indoor plants as supplementary only",
-      what: "Keep plants if you enjoy them, but rely on source control, ventilation timing and filtration for particles.",
-      why: "Plants are often promoted as air purifiers.",
-      how: "At normal household densities plants remove negligible PM2.5 compared with ventilation or HEPA filtration.",
-      limitation:
-        "Overwatered soil can encourage mould; plants never replace source control or filtration.",
-      basis: "Qualitative",
-    }),
-  );
+  out.push({
+    id: "indoor-plants",
+    pillar: "indoor",
+    title: "Treat indoor plants as supplementary only",
+    what: "Keep plants if you enjoy them, but rely on source control, ventilation timing and filtration for particles.",
+    why: "Plants are often promoted as air purifiers.",
+    how: "At normal household densities plants remove negligible PM2.5 compared with ventilation or HEPA filtration.",
+    limitation:
+      "Overwatered soil can encourage mould; plants never replace source control or filtration.",
+    basis: "Qualitative",
+  });
   return out;
 }
 
 function sustainableRecs(c: RuleContext, p: HouseholdProfile): Recommendation[] {
   return [
-    rec({
+    {
       id: "sustain-transport",
       pillar: "sustainable",
       title: "Choose lower-emission trips",
@@ -218,8 +211,8 @@ function sustainableRecs(c: RuleContext, p: HouseholdProfile): Recommendation[] 
       limitation:
         "Last-mile gaps and safety may limit options; the individual effect is small but adds up across households.",
       basis: "Qualitative",
-    }),
-    rec({
+    },
+    {
       id: "sustain-energy",
       pillar: "sustainable",
       title: "Cleaner household energy habits",
@@ -228,7 +221,7 @@ function sustainableRecs(c: RuleContext, p: HouseholdProfile): Recommendation[] 
       how: "Removes local combustion sources and reduces indirect emissions.",
       limitation: "Induction cookware and appliance upgrades involve cost.",
       basis: "Qualitative",
-    }),
+    },
   ];
 }
 

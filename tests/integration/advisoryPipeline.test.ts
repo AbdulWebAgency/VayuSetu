@@ -77,7 +77,7 @@ describe("advisory pipeline", () => {
       },
     );
     expect(r1.advisory.mode).toBe("rule_based");
-    expect(r1.advisory.modeReason).toMatch(/rate-limited/);
+    expect(r1.advisory.modeReason).toBe("AI rate-limited — rule-based guidance");
     const r2 = await buildAdvisory(
       { location: DELHI, profile: profile() },
       {
@@ -89,7 +89,39 @@ describe("advisory pipeline", () => {
         now: () => NOW,
       },
     );
-    expect(r2.advisory.modeReason).toMatch(/validation/);
+    expect(r2.advisory.modeReason).toBe("AI output failed validation — rule-based guidance");
+  });
+  it("prioritises rate limiting when Gemini also reports a schema failure", async () => {
+    const result = await buildAdvisory(
+      { location: DELHI, profile: profile() },
+      {
+        openMeteo: om,
+        geminiKey: "k",
+        gemini: async () => {
+          throw new UpstreamError("schema", 429);
+        },
+        now: () => NOW,
+      },
+    );
+    expect(result.advisory.mode).toBe("rule_based");
+    expect(result.advisory.modeReason).toBe("AI rate-limited — rule-based guidance");
+  });
+  it("uses the generic fallback without exposing internal Gemini error details", async () => {
+    const internalMessage = "private Gemini diagnostic marker: provider adapter failed";
+    const result = await buildAdvisory(
+      { location: DELHI, profile: profile() },
+      {
+        openMeteo: om,
+        geminiKey: "k",
+        gemini: async () => {
+          throw new Error(internalMessage);
+        },
+        now: () => NOW,
+      },
+    );
+    expect(result.advisory.mode).toBe("rule_based");
+    expect(result.advisory.modeReason).toBe("AI unavailable — rule-based guidance");
+    expect(JSON.stringify(result)).not.toContain(internalMessage);
   });
   it("prefers fresh ground station, falls back to model when stale, unavailable when all fail", async () => {
     const station = {

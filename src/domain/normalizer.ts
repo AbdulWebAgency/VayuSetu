@@ -6,20 +6,20 @@ import {
 } from "@/types/airQuality";
 import { PROVIDER_LABEL } from "./catalogues";
 
-const num = z.number().nullable().optional();
+const optionalNullableNumber = z.number().nullable().optional();
 
 export const OpenMeteoAirSchema = z.object({
   latitude: z.number(),
   longitude: z.number(),
   current: z.object({
     time: z.string(),
-    pm2_5: num,
-    pm10: num,
-    nitrogen_dioxide: num,
-    sulphur_dioxide: num,
-    ozone: num,
-    carbon_monoxide: num,
-    us_aqi: num,
+    pm2_5: optionalNullableNumber,
+    pm10: optionalNullableNumber,
+    nitrogen_dioxide: optionalNullableNumber,
+    sulphur_dioxide: optionalNullableNumber,
+    ozone: optionalNullableNumber,
+    carbon_monoxide: optionalNullableNumber,
+    us_aqi: optionalNullableNumber,
   }),
 });
 
@@ -206,17 +206,17 @@ export function normalizeCpcb(
   });
   if (!times.length) return null;
   const measured = new Date(Math.min(...times));
-  const val = (id: string): number | null => {
+  const readPollutantAverage = (id: string): number | null => {
     const r = station.rows.find((x) => x.pollutant_id.toUpperCase() === id);
     const n = r ? Number(r.avg_value) : NaN;
     return Number.isFinite(n) && n >= 0 ? n : null;
   };
   const pollutants = {
-    pm25: val("PM2.5"),
-    pm10: val("PM10"),
-    no2: val("NO2"),
-    so2: val("SO2"),
-    o3: val("OZONE"),
+    pm25: readPollutantAverage("PM2.5"),
+    pm10: readPollutantAverage("PM10"),
+    no2: readPollutantAverage("NO2"),
+    so2: readPollutantAverage("SO2"),
+    o3: readPollutantAverage("OZONE"),
     co: null,
   };
   if (pollutants.pm25 === null && pollutants.pm10 === null) return null;

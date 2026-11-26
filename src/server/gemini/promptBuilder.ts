@@ -12,7 +12,7 @@ RULES:
 - basis: "Measured" for ground_station data, "Estimated" for model_estimate, "Qualitative" for general advice.
 - Output ONLY JSON: {"recommendations":[{"id","pillar","title","what","why","how","limitation","basis"}],"planner":{"morning":{"action","reason","pillar"},"afternoon":{...},"evening":{...}}}`;
 
-const esc = (s: string): string =>
+const escapePromptData = (s: string): string =>
   s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c] ?? c);
 
 /** Builds the user turn: structured, escaped data blocks only. No free text from users is included. */
@@ -37,9 +37,9 @@ export function buildUserPrompt(
     : { location: locationName, live_usable: false, pollutants: null };
   const prof = { ...profile, has_air_purifier: profile.hasAirPurifier };
   return [
-    `<household_profile>${esc(JSON.stringify(prof))}</household_profile>`,
-    `<verified_environment>${esc(JSON.stringify(env))}</verified_environment>`,
-    `<rule_baseline>${esc(JSON.stringify({ tier: baseline.sensitivityTier, pm25_band: baseline.pm25Band, ventilation: baseline.ventilation, planner: baseline.planner, titles: baseline.recommendations.map((r) => r.title) }))}</rule_baseline>`,
+    `<household_profile>${escapePromptData(JSON.stringify(prof))}</household_profile>`,
+    `<verified_environment>${escapePromptData(JSON.stringify(env))}</verified_environment>`,
+    `<rule_baseline>${escapePromptData(JSON.stringify({ tier: baseline.sensitivityTier, pm25_band: baseline.pm25Band, ventilation: baseline.ventilation, planner: baseline.planner, titles: baseline.recommendations.map((r) => r.title) }))}</rule_baseline>`,
     "Write tailored recommendations and a morning/afternoon/evening plan as JSON.",
   ].join("\n");
 }

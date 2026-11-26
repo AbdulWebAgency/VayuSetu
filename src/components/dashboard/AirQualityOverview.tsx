@@ -7,7 +7,7 @@ import { pm25Band } from "@/domain/ruleEngine";
 import { SeverityBadge } from "@/components/common/SeverityBadge";
 
 const FRESH = { live: "Live", aging: "Aging", stale: "Stale" } as const;
-const fmt = (iso: string) =>
+const formatTimestamp = (iso: string) =>
   new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 const POLL: [keyof Pollutants, string][] = [
   ["pm25", "PM2.5"],
@@ -107,12 +107,12 @@ export function AirQualityOverview({
                 <SeverityBadge band={pm25Band(data.pollutants.pm25)} value={data.pollutants.pm25} />
               </div>
               {(() => {
-                const f = computeFreshness(data.measuredAt, data.measurementType, now);
+                const freshness = computeFreshness(data.measuredAt, data.measurementType, now);
                 return (
                   <p className="inline-flex items-center gap-1 text-sm" data-testid="freshness">
                     <Clock className="h-4 w-4" aria-hidden />
-                    <strong>{FRESH[f]}</strong> · measured {ageMinutes(data.measuredAt, now)} min
-                    ago
+                    <strong>{FRESH[freshness]}</strong> · measured{" "}
+                    {ageMinutes(data.measuredAt, now)} min ago
                   </p>
                 );
               })()}
@@ -153,11 +153,11 @@ export function AirQualityOverview({
               </div>
               <div>
                 <dt className="inline font-semibold">Measured at: </dt>
-                <dd className="inline">{fmt(data.measuredAt)}</dd>
+                <dd className="inline">{formatTimestamp(data.measuredAt)}</dd>
               </div>
               <div>
                 <dt className="inline font-semibold">Fetched at: </dt>
-                <dd className="inline">{fmt(data.fetchedAt)}</dd>
+                <dd className="inline">{formatTimestamp(data.fetchedAt)}</dd>
               </div>
               {data.notes.map((n) => (
                 <p key={n} className="sm:col-span-2">

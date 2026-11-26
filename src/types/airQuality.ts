@@ -40,6 +40,7 @@ export const AqiScaleSchema = z
   .enum(["US_EPA", "IN_NAQI"])
   .describe("AQI scale supplied by provider");
 export const FreshnessSchema = z.enum(["live", "aging", "stale"]);
+export type Freshness = z.infer<typeof FreshnessSchema>;
 
 const conc = z.number().nonnegative().nullable();
 export const PollutantsSchema = z.object({

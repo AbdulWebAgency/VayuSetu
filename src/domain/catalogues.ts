@@ -49,12 +49,11 @@ export interface Scenario {
   profile: HouseholdProfile;
 }
 
-const city = (n: string): string => n;
 export const SCENARIOS: Scenario[] = [
   {
     id: "A",
     label: "Family with young children · Hyderabad",
-    cityName: city("Hyderabad"),
+    cityName: "Hyderabad",
     profile: {
       ...DEFAULT_PROFILE,
       householdSize: 4,
@@ -67,7 +66,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "B",
     label: "Working commuter · Delhi",
-    cityName: city("Delhi"),
+    cityName: "Delhi",
     profile: {
       ...DEFAULT_PROFILE,
       householdSize: 2,
@@ -80,7 +79,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "C",
     label: "Elderly member · Mumbai",
-    cityName: city("Mumbai"),
+    cityName: "Mumbai",
     profile: {
       ...DEFAULT_PROFILE,
       householdSize: 3,
@@ -95,7 +94,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "D",
     label: "Student household · Kolkata",
-    cityName: city("Kolkata"),
+    cityName: "Kolkata",
     profile: {
       ...DEFAULT_PROFILE,
       householdSize: 3,

@@ -11,6 +11,14 @@ export interface AdvisoryDeps extends ProviderDeps {
   gemini?: typeof callGemini;
 }
 
+function describeAiFailure(error: unknown): string {
+  if (error instanceof UpstreamError) {
+    if (error.status === 429) return "AI rate-limited";
+    if (error.reason === "schema") return "AI output failed validation";
+  }
+  return "AI unavailable";
+}
+
 /** Full pipeline: provider → rule engine → Gemini → output guard, with deterministic fallback. */
 export async function buildAdvisory(
   req: AdvisoryRequest,
@@ -38,12 +46,7 @@ export async function buildAdvisory(
     );
     return { air, advisory: guardAiAdvisory(ai, req.profile, baseline, data, now) };
   } catch (e) {
-    const reason =
-      e instanceof UpstreamError && e.status === 429
-        ? "AI rate-limited"
-        : e instanceof UpstreamError && e.reason === "schema"
-          ? "AI output failed validation"
-          : "AI unavailable";
+    const reason = describeAiFailure(e);
     return { air, advisory: { ...baseline, modeReason: `${reason} — rule-based guidance` } };
   }
 }

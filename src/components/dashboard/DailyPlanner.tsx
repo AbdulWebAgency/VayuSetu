@@ -1,6 +1,6 @@
 import { Moon, Sun, Sunrise } from "lucide-react";
 import type { Planner } from "@/types/airQuality";
-import { PILLARS } from "./RecommendationCards";
+import { PILLARS } from "./pillarMetadata";
 
 const PERIODS = [
   { key: "morning", label: "Morning", Icon: Sunrise },
@@ -17,7 +17,7 @@ export function DailyPlanner({ planner }: { planner: Planner }) {
       </h2>
       <ol className="grid gap-4 md:grid-cols-3">
         {PERIODS.map(({ key, label, Icon }) => {
-          const s = planner[key];
+          const plannerSlot = planner[key];
           return (
             <li key={key} className="space-y-1.5 rounded-md bg-muted p-4" aria-label={label}>
               <p className="flex items-center gap-2 font-display text-lg font-semibold">
@@ -26,15 +26,15 @@ export function DailyPlanner({ planner }: { planner: Planner }) {
               </p>
               <p className="text-sm">
                 <span className="font-semibold">Suggested action: </span>
-                {s.action}
+                {plannerSlot.action}
               </p>
               <p className="text-sm text-muted-foreground">
                 <span className="font-semibold text-foreground">Reason: </span>
-                {s.reason}
+                {plannerSlot.reason}
               </p>
               <p className="text-xs">
                 <span className="font-semibold">Focus pillar: </span>
-                {PILLARS[s.pillar].title}
+                {PILLARS[plannerSlot.pillar].title}
               </p>
             </li>
           );

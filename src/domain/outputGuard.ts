@@ -124,20 +124,27 @@ export function guardAiAdvisory(
     if (!accepted.some((r) => r.pillar === pillar))
       accepted.push(...baseline.recommendations.filter((r) => r.pillar === pillar));
   }
-  const slot = (k: keyof Advisory["planner"]) => {
-    const s = ai.planner[k];
-    if (unsafe(`${s.action} ${s.reason}`) || [s.action, s.reason].some(unsafe)) {
+  const guardPlannerSlot = (k: keyof Advisory["planner"]) => {
+    const candidateSlot = ai.planner[k];
+    if (
+      unsafe(`${candidateSlot.action} ${candidateSlot.reason}`) ||
+      [candidateSlot.action, candidateSlot.reason].some(unsafe)
+    ) {
       rejected++;
       return baseline.planner[k];
     }
-    return s;
+    return candidateSlot;
   };
   return {
     ...baseline,
     mode: "ai_enriched",
     modeReason: "AI-enriched guidance, checked by safety rules",
     recommendations: accepted,
-    planner: { morning: slot("morning"), afternoon: slot("afternoon"), evening: slot("evening") },
+    planner: {
+      morning: guardPlannerSlot("morning"),
+      afternoon: guardPlannerSlot("afternoon"),
+      evening: guardPlannerSlot("evening"),
+    },
     rejectedAiItems: rejected,
   };
 }

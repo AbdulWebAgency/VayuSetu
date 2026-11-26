@@ -1,11 +1,7 @@
 import { Bus, Home, Leaf } from "lucide-react";
 import type { Advisory, Pillar } from "@/types/airQuality";
 
-export const PILLARS: Record<Pillar, { title: string; Icon: typeof Bus }> = {
-  routines: { title: "Low-emission daily routines", Icon: Bus },
-  indoor: { title: "Indoor air-quality guidance", Icon: Home },
-  sustainable: { title: "Sustainable alternatives & impact", Icon: Leaf },
-};
+import { PILLARS } from "./pillarMetadata";
 
 /** Recommendations grouped by the three pillars with the mandatory four-part structure and basis badge. */
 export function RecommendationCards({ advisory }: { advisory: Advisory }) {

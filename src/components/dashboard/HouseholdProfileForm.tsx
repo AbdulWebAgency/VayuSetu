@@ -54,7 +54,7 @@ function Check({
 export function HouseholdProfileForm({ profile: p, onChange }: Props) {
   const set = <K extends keyof HouseholdProfile>(k: K, v: HouseholdProfile[K]) =>
     onChange({ ...p, [k]: v });
-  const num = (s: string): number | null =>
+  const parseOptionalNumber = (s: string): number | null =>
     s.trim() === "" || !Number.isFinite(Number(s)) ? null : Number(s);
   return (
     <section aria-labelledby="prof-h" className="card-surface p-5 space-y-4">
@@ -178,8 +178,11 @@ export function HouseholdProfileForm({ profile: p, onChange }: Props) {
               max={1500}
               value={p.indoorPm25 ?? ""}
               onChange={(e) => {
-                const n = num(e.target.value);
-                set("indoorPm25", n === null ? null : Math.min(1500, Math.max(0, n)));
+                const parsedValue = parseOptionalNumber(e.target.value);
+                set(
+                  "indoorPm25",
+                  parsedValue === null ? null : Math.min(1500, Math.max(0, parsedValue)),
+                );
               }}
             />
           </div>
@@ -192,10 +195,12 @@ export function HouseholdProfileForm({ profile: p, onChange }: Props) {
               max={1440}
               value={p.indoorReadingAgeMinutes ?? ""}
               onChange={(e) => {
-                const n = num(e.target.value);
+                const parsedValue = parseOptionalNumber(e.target.value);
                 set(
                   "indoorReadingAgeMinutes",
-                  n === null ? null : Math.min(1440, Math.max(0, Math.round(n))),
+                  parsedValue === null
+                    ? null
+                    : Math.min(1440, Math.max(0, Math.round(parsedValue))),
                 );
               }}
             />

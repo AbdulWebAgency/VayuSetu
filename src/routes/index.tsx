@@ -78,7 +78,7 @@ function Index() {
         };
       }
       if (id !== reqId.current) return;
-      const why =
+      const fallbackReason =
         e instanceof ApiError && e.status === 429 ? e.message : "Advisory service unavailable";
       setAir(a);
       setAdvisory(
@@ -86,7 +86,7 @@ function Index() {
           a.status === "ok" ? a.data : null,
           prof,
           new Date(),
-          `${why} — rule-based guidance`,
+          `${fallbackReason} — rule-based guidance`,
         ),
       );
       setStatus(`Rule-based guidance ready for ${loc.name}.`);

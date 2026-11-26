@@ -1,6 +1,6 @@
-import type { NormalizedAirQuality } from "@/types/airQuality";
+import type { Freshness, NormalizedAirQuality } from "@/types/airQuality";
 
-export type Freshness = "live" | "aging" | "stale";
+export type { Freshness } from "@/types/airQuality";
 
 /**
  * Freshness from the provider's measuredAt (never fetchedAt).
