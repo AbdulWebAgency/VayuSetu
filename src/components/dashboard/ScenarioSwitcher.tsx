@@ -1,7 +1,13 @@
 import { SCENARIOS, type Scenario } from "@/domain/catalogues";
 
 /** One-click evaluator scenarios (city + household profile). */
-export function ScenarioSwitcher({ onSelect, activeId }: { onSelect: (s: Scenario) => void; activeId: string | null }) {
+export function ScenarioSwitcher({
+  onSelect,
+  activeId,
+}: {
+  onSelect: (s: Scenario) => void;
+  activeId: string | null;
+}) {
   return (
     <nav aria-label="Sample scenarios" className="flex flex-wrap gap-2">
       {SCENARIOS.map((s) => (

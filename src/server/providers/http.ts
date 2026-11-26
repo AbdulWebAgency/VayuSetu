@@ -1,5 +1,8 @@
 /** Upstream fetch with a bounded timeout and at most one retry on network errors / 5xx (never on 4xx or 429). */
-export async function fetchJson(url: string, opts: { timeoutMs: number; init?: RequestInit; retries?: number; deadlineAt?: number } ): Promise<unknown> {
+export async function fetchJson(
+  url: string,
+  opts: { timeoutMs: number; init?: RequestInit; retries?: number; deadlineAt?: number },
+): Promise<unknown> {
   const retries = opts.retries ?? 1;
   for (let attempt = 0; ; attempt++) {
     const remaining = (opts.deadlineAt ?? Infinity) - Date.now();
@@ -7,13 +10,20 @@ export async function fetchJson(url: string, opts: { timeoutMs: number; init?: R
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => {
-        controller.abort();
-        reject(new UpstreamError(Date.now() >= (opts.deadlineAt ?? Infinity) ? "deadline" : "timeout"));
-      }, Math.min(opts.timeoutMs, remaining));
+      timer = setTimeout(
+        () => {
+          controller.abort();
+          reject(
+            new UpstreamError(Date.now() >= (opts.deadlineAt ?? Infinity) ? "deadline" : "timeout"),
+          );
+        },
+        Math.min(opts.timeoutMs, remaining),
+      );
     });
     try {
-      const signal = opts.init?.signal ? AbortSignal.any([opts.init.signal, controller.signal]) : controller.signal;
+      const signal = opts.init?.signal
+        ? AbortSignal.any([opts.init.signal, controller.signal])
+        : controller.signal;
       return await Promise.race([
         (async () => {
           const res = await fetch(url, { ...opts.init, signal, redirect: "manual" });
@@ -38,7 +48,10 @@ export async function fetchJson(url: string, opts: { timeoutMs: number; init?: R
 }
 
 export class UpstreamError extends Error {
-  constructor(public readonly reason: string, public readonly status?: number) {
+  constructor(
+    public readonly reason: string,
+    public readonly status?: number,
+  ) {
     super(`Upstream failure: ${reason}`);
   }
 }

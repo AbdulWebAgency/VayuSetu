@@ -6,7 +6,12 @@ import { air, DELHI, NOW } from "../fixtures/payloads";
 describe("provider fallback waterfall (CPCB -> WAQI -> Open-Meteo)", () => {
   it("uses fresh CPCB observation first and skips lower-priority providers", async () => {
     const cpcb = vi.fn().mockResolvedValue(
-      air({ provider: "CPCB", providerName: "CPCB", measurementType: "ground_station", measuredAt: "2026-11-22T11:30:00.000Z" }),
+      air({
+        provider: "CPCB",
+        providerName: "CPCB",
+        measurementType: "ground_station",
+        measuredAt: "2026-11-22T11:30:00.000Z",
+      }),
     );
     const waqi = vi.fn();
     const openMeteo = vi.fn();
@@ -29,7 +34,12 @@ describe("provider fallback waterfall (CPCB -> WAQI -> Open-Meteo)", () => {
 
   it("falls back cleanly to WAQI when DATA_GOV_IN_API_KEY is unconfigured", async () => {
     const waqi = vi.fn().mockResolvedValue(
-      air({ provider: "WAQI", providerName: "WAQI", measurementType: "ground_station", measuredAt: "2026-11-22T11:15:00.000Z" }),
+      air({
+        provider: "WAQI",
+        providerName: "WAQI",
+        measurementType: "ground_station",
+        measuredAt: "2026-11-22T11:15:00.000Z",
+      }),
     );
     const openMeteo = vi.fn();
 
@@ -49,11 +59,19 @@ describe("provider fallback waterfall (CPCB -> WAQI -> Open-Meteo)", () => {
 
   it("skips stale CPCB and failed WAQI to serve Open-Meteo CAMS model estimate", async () => {
     const cpcb = vi.fn().mockResolvedValue(
-      air({ provider: "CPCB", measurementType: "ground_station", measuredAt: "2026-11-22T07:00:00.000Z" }), // > 3h stale
+      air({
+        provider: "CPCB",
+        measurementType: "ground_station",
+        measuredAt: "2026-11-22T07:00:00.000Z",
+      }), // > 3h stale
     );
     const waqi = vi.fn().mockRejectedValue(new UpstreamError("status 503", 503));
     const openMeteo = vi.fn().mockResolvedValue(
-      air({ provider: "OPEN_METEO", measurementType: "model_estimate", measuredAt: "2026-11-22T11:00:00.000Z" }),
+      air({
+        provider: "OPEN_METEO",
+        measurementType: "model_estimate",
+        measuredAt: "2026-11-22T11:00:00.000Z",
+      }),
     );
 
     const res = await resolveAirQuality(DELHI, {
@@ -82,6 +100,10 @@ describe("provider fallback waterfall (CPCB -> WAQI -> Open-Meteo)", () => {
     if (res.status === "unavailable") {
       expect(res.message).toBe("Live Environmental Data Unavailable");
     }
-    expect(res.attempted).toEqual(["CPCB: not configured", "WAQI: not configured", "Open-Meteo: failed"]);
+    expect(res.attempted).toEqual([
+      "CPCB: not configured",
+      "WAQI: not configured",
+      "Open-Meteo: failed",
+    ]);
   });
 });

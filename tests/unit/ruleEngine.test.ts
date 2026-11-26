@@ -15,7 +15,9 @@ describe("rule engine", () => {
   });
   it("covers all three pillars and three planner periods", () => {
     const a = runRuleEngine(air(), profile(), NOW);
-    expect(new Set(a.recommendations.map((r) => r.pillar))).toEqual(new Set(["routines", "indoor", "sustainable"]));
+    expect(new Set(a.recommendations.map((r) => r.pillar))).toEqual(
+      new Set(["routines", "indoor", "sustainable"]),
+    );
     expect(a.planner.morning.action.length).toBeGreaterThan(3);
   });
   it("never recommends running a purifier the household does not own", () => {

@@ -7,7 +7,8 @@ export const limiters = {
   advisory: createRateLimiter(6, 60_000),
 };
 
-export type GuardResult<T> = { ok: true; data: T; headers: Headers } | { ok: false; response: Response };
+export type GuardResult<T> =
+  { ok: true; data: T; headers: Headers } | { ok: false; response: Response };
 
 const json = (body: unknown, status: number, headers: Headers): Response => {
   headers.set("content-type", "application/json; charset=utf-8");
@@ -34,13 +35,16 @@ export function originAllowed(
   } catch {
     return { ok: false, origin };
   }
-  if (parsedOrigin.origin !== origin || !["https:", "http:"].includes(parsedOrigin.protocol)) return { ok: false, origin };
+  if (parsedOrigin.origin !== origin || !["https:", "http:"].includes(parsedOrigin.protocol))
+    return { ok: false, origin };
   return { ok: origin === self.origin || allowed.includes(origin), origin };
 }
 
 function clientKey(request: Request): string {
   return (
-    request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "anon"
+    request.headers.get("cf-connecting-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "anon"
   );
 }
 
@@ -69,11 +73,16 @@ export async function guardRequest<T>(
     headers.set("retry-after", String(wait));
     return {
       ok: false,
-      response: json({ error: `Too many requests. Try again in ${wait}s.`, retryAfter: wait }, 429, headers),
+      response: json(
+        { error: `Too many requests. Try again in ${wait}s.`, retryAfter: wait },
+        429,
+        headers,
+      ),
     };
   }
   const declared = Number(request.headers.get("content-length") ?? "0");
-  if (declared > MAX_BODY_BYTES) return { ok: false, response: json({ error: "Payload too large" }, 413, headers) };
+  if (declared > MAX_BODY_BYTES)
+    return { ok: false, response: json({ error: "Payload too large" }, 413, headers) };
   let body = "";
   const reader = request.method === "GET" ? undefined : request.body?.getReader();
   if (reader) {

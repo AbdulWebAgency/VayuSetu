@@ -1,4 +1,8 @@
-import type { AirQualityResponse, NormalizedAirQuality, ResolvedLocation } from "@/types/airQuality";
+import type {
+  AirQualityResponse,
+  NormalizedAirQuality,
+  ResolvedLocation,
+} from "@/types/airQuality";
 import { computeFreshness } from "@/domain/freshness";
 import { fetchCpcb } from "./cpcbProvider";
 import { fetchOpenMeteo } from "./openMeteoProvider";
@@ -23,7 +27,10 @@ const eligible = (n: NormalizedAirQuality | null, now: Date): n is NormalizedAir
  * Ground station (CPCB, then WAQI, when configured and fresh) → Open-Meteo CAMS model.
  * Never merges providers. Returns "unavailable" when all fail.
  */
-export async function resolveAirQuality(loc: ResolvedLocation, deps: ProviderDeps = {}): Promise<AirQualityResponse> {
+export async function resolveAirQuality(
+  loc: ResolvedLocation,
+  deps: ProviderDeps = {},
+): Promise<AirQualityResponse> {
   const now = deps.now ?? (() => new Date());
   const attempted: string[] = [];
   const deadlineAt = Date.now() + PROVIDER_DEADLINE_MS;
@@ -31,15 +38,26 @@ export async function resolveAirQuality(loc: ResolvedLocation, deps: ProviderDep
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const remaining = deadlineAt - Date.now();
-      if (remaining <= 0) { attempted.push(`${name}: deadline exceeded`); return null; }
+      if (remaining <= 0) {
+        attempted.push(`${name}: deadline exceeded`);
+        return null;
+      }
       const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new UpstreamError("deadline")), remaining);
       });
       const r = await Promise.race([fn(), timeout]);
-      if (eligible(r, now())) { attempted.push(`${name}: used`); return r; }
+      if (eligible(r, now())) {
+        attempted.push(`${name}: used`);
+        return r;
+      }
       attempted.push(r ? `${name}: stale` : `${name}: no eligible station`);
-    } catch (e) { attempted.push(`${name}: ${e instanceof UpstreamError && e.reason === "deadline" ? "deadline exceeded" : "failed"}`); }
-    finally { if (timer !== undefined) clearTimeout(timer); }
+    } catch (e) {
+      attempted.push(
+        `${name}: ${e instanceof UpstreamError && e.reason === "deadline" ? "deadline exceeded" : "failed"}`,
+      );
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
     return null;
   };
   const cpcbKey = deps.cpcbKey;
@@ -49,10 +67,14 @@ export async function resolveAirQuality(loc: ResolvedLocation, deps: ProviderDep
   } else attempted.push("CPCB: not configured");
   const waqiToken = deps.waqiToken;
   if (waqiToken) {
-    const r = await tryStep("WAQI", () => (deps.waqi ?? fetchWaqi)(loc.coordinates, waqiToken, deadlineAt));
+    const r = await tryStep("WAQI", () =>
+      (deps.waqi ?? fetchWaqi)(loc.coordinates, waqiToken, deadlineAt),
+    );
     if (r) return { status: "ok", data: r, attempted };
   } else attempted.push("WAQI: not configured");
-  const m = await tryStep("Open-Meteo", () => (deps.openMeteo ?? fetchOpenMeteo)(loc.coordinates, deadlineAt));
+  const m = await tryStep("Open-Meteo", () =>
+    (deps.openMeteo ?? fetchOpenMeteo)(loc.coordinates, deadlineAt),
+  );
   if (m) return { status: "ok", data: m, attempted };
   return { status: "unavailable", message: "Live Environmental Data Unavailable", attempted };
 }

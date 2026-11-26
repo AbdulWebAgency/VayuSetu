@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { CoordinatesSchema, type NormalizedAirQuality, type ResolvedLocation } from "@/types/airQuality";
+import {
+  CoordinatesSchema,
+  type NormalizedAirQuality,
+  type ResolvedLocation,
+} from "@/types/airQuality";
 import { PROVIDER_LABEL } from "./catalogues";
 
 const num = z.number().nullable().optional();
@@ -75,8 +79,12 @@ export function normalizeOpenMeteo(raw: unknown, fetchedAt: Date): NormalizedAir
     fetchedAt: fetchedAt.toISOString(),
     aqi: aqi === null ? null : { value: Math.round(aqi), scale: "US_EPA" },
     pollutants: {
-      pm25: clean(c.pm2_5), pm10: clean(c.pm10), no2: clean(c.nitrogen_dioxide),
-      so2: clean(c.sulphur_dioxide), o3: clean(c.ozone), co: clean(c.carbon_monoxide),
+      pm25: clean(c.pm2_5),
+      pm10: clean(c.pm10),
+      no2: clean(c.nitrogen_dioxide),
+      so2: clean(c.sulphur_dioxide),
+      o3: clean(c.ozone),
+      co: clean(c.carbon_monoxide),
     },
     units: "µg/m³",
     notes: ["Model grid estimate, not a ground-station measurement."],
@@ -94,7 +102,11 @@ export function normalizeWaqi(raw: unknown, fetchedAt: Date): NormalizedAirQuali
   return {
     provider: "WAQI",
     providerName: PROVIDER_LABEL.WAQI,
-    agency: d.attributions?.map((a) => a.name).slice(0, 2).join("; ") || null,
+    agency:
+      d.attributions
+        ?.map((a) => a.name)
+        .slice(0, 2)
+        .join("; ") || null,
     measurementType: "ground_station",
     stationId: `@${d.idx}`,
     stationName: d.city.name,
@@ -104,7 +116,9 @@ export function normalizeWaqi(raw: unknown, fetchedAt: Date): NormalizedAirQuali
     aqi: aqi === null ? null : { value: aqi, scale: "US_EPA" },
     pollutants: { pm25: null, pm10: null, no2: null, so2: null, o3: null, co: null },
     units: "µg/m³",
-    notes: ["WAQI publishes per-pollutant sub-indices rather than µg/m³ concentrations; concentrations shown as unavailable."],
+    notes: [
+      "WAQI publishes per-pollutant sub-indices rather than µg/m³ concentrations; concentrations shown as unavailable.",
+    ],
   };
 }
 
@@ -119,45 +133,77 @@ export function parseCpcbTime(s: string): Date | null {
 
 const haversineKm = (a: { lat: number; lon: number }, b: { lat: number; lon: number }): number => {
   const r = (x: number) => (x * Math.PI) / 180;
-  const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lon - a.lon) / 2) ** 2;
+  const h =
+    Math.sin(r(b.lat - a.lat) / 2) ** 2 +
+    Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lon - a.lon) / 2) ** 2;
   return 6371 * 2 * Math.asin(Math.sqrt(h));
 };
 export { haversineKm };
 
 /** Picks the nearest CPCB station (≤ maxKm) and normalizes its pollutant rows. CPCB OGD supplies no AQI. */
-export function normalizeCpcb(raw: unknown, target: { lat: number; lon: number }, fetchedAt: Date, maxKm = 25, now = fetchedAt): NormalizedAirQuality | null {
+export function normalizeCpcb(
+  raw: unknown,
+  target: { lat: number; lon: number },
+  fetchedAt: Date,
+  maxKm = 25,
+  now = fetchedAt,
+): NormalizedAirQuality | null {
   const rows = CpcbSchema.parse(raw).records;
   const byStation = new Map<string, z.infer<typeof CpcbRecordSchema>[]>();
   for (const r of rows) byStation.set(r.station, [...(byStation.get(r.station) ?? []), r]);
-  let best: { name: string; rows: z.infer<typeof CpcbRecordSchema>[]; km: number; lat: number; lon: number } | null = null;
+  let best: {
+    name: string;
+    rows: z.infer<typeof CpcbRecordSchema>[];
+    km: number;
+    lat: number;
+    lon: number;
+  } | null = null;
   for (const [name, list] of byStation) {
-    const timed = list.flatMap((row) => {
-      const time = parseCpcbTime(row.last_update)?.getTime();
-      const value = Number(row.avg_value);
-      if (time === undefined || time > now.getTime() || now.getTime() - time > 180 * 60_000 || !Number.isFinite(value) || value < 0 || !["PM2.5", "PM10", "NO2", "SO2", "OZONE"].includes(row.pollutant_id.toUpperCase()) || String(row.avg_value).trim() === "") return [];
-      return [{ row, time }];
-    }).sort((a, b) => b.time - a.time);
+    const timed = list
+      .flatMap((row) => {
+        const time = parseCpcbTime(row.last_update)?.getTime();
+        const value = Number(row.avg_value);
+        if (
+          time === undefined ||
+          time > now.getTime() ||
+          now.getTime() - time > 180 * 60_000 ||
+          !Number.isFinite(value) ||
+          value < 0 ||
+          !["PM2.5", "PM10", "NO2", "SO2", "OZONE"].includes(row.pollutant_id.toUpperCase()) ||
+          String(row.avg_value).trim() === ""
+        )
+          return [];
+        return [{ row, time }];
+      })
+      .sort((a, b) => b.time - a.time);
     const newest = timed[0];
     if (!newest) continue;
     const retained = timed.filter((r) => newest.time - r.time <= 90 * 60_000);
     // Keep only the newest retained reading for each pollutant.
     const seen = new Set<string>();
-    const comparable = retained.filter(({ row }) => {
-      const id = row.pollutant_id.toUpperCase();
-      if (seen.has(id)) return false;
-      seen.add(id); return true;
-    }).map(({ row }) => row);
+    const comparable = retained
+      .filter(({ row }) => {
+        const id = row.pollutant_id.toUpperCase();
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .map(({ row }) => row);
     if (!seen.has("PM2.5") && !seen.has("PM10")) continue;
     const first = comparable[0];
     if (!first) continue;
-    const lat = Number(first.latitude), lon = Number(first.longitude);
+    const lat = Number(first.latitude),
+      lon = Number(first.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
     const km = haversineKm(target, { lat, lon });
     if (km <= maxKm && (!best || km < best.km)) best = { name, rows: comparable, km, lat, lon };
   }
   if (!best || !best.rows[0]) return null;
   const station = best;
-  const times = station.rows.flatMap((r) => { const t = parseCpcbTime(r.last_update); return t ? [t.getTime()] : []; });
+  const times = station.rows.flatMap((r) => {
+    const t = parseCpcbTime(r.last_update);
+    return t ? [t.getTime()] : [];
+  });
   if (!times.length) return null;
   const measured = new Date(Math.min(...times));
   const val = (id: string): number | null => {
@@ -165,7 +211,14 @@ export function normalizeCpcb(raw: unknown, target: { lat: number; lon: number }
     const n = r ? Number(r.avg_value) : NaN;
     return Number.isFinite(n) && n >= 0 ? n : null;
   };
-  const pollutants = { pm25: val("PM2.5"), pm10: val("PM10"), no2: val("NO2"), so2: val("SO2"), o3: val("OZONE"), co: null };
+  const pollutants = {
+    pm25: val("PM2.5"),
+    pm10: val("PM10"),
+    no2: val("NO2"),
+    so2: val("SO2"),
+    o3: val("OZONE"),
+    co: null,
+  };
   if (pollutants.pm25 === null && pollutants.pm10 === null) return null;
   return {
     provider: "CPCB",
@@ -180,7 +233,9 @@ export function normalizeCpcb(raw: unknown, target: { lat: number; lon: number }
     aqi: null,
     pollutants,
     units: "µg/m³",
-    notes: [`Station ${best.km.toFixed(1)} km from selected location. CPCB OGD feed provides concentrations only; AQI not supplied. CO omitted (published in mg/m³).`],
+    notes: [
+      `Station ${best.km.toFixed(1)} km from selected location. CPCB OGD feed provides concentrations only; AQI not supplied. CO omitted (published in mg/m³).`,
+    ],
   };
 }
 
@@ -191,5 +246,9 @@ export function normalizeGeocode(raw: unknown): ResolvedLocation[] {
     .filter((r) => r.country_code === "IN")
     .filter((r) => CoordinatesSchema.safeParse({ lat: r.latitude, lon: r.longitude }).success)
     .slice(0, 5)
-    .map((r) => ({ name: r.name, admin: r.admin1 ?? null, coordinates: { lat: r.latitude, lon: r.longitude } }));
+    .map((r) => ({
+      name: r.name,
+      admin: r.admin1 ?? null,
+      coordinates: { lat: r.latitude, lon: r.longitude },
+    }));
 }

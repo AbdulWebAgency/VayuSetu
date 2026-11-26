@@ -1,4 +1,10 @@
-import { normalizeCpcb, normalizeGeocode, normalizeOpenMeteo, normalizeWaqi, parseCpcbTime } from "@/domain/normalizer";
+import {
+  normalizeCpcb,
+  normalizeGeocode,
+  normalizeOpenMeteo,
+  normalizeWaqi,
+  parseCpcbTime,
+} from "@/domain/normalizer";
 import { cpcbRaw, geocodeRaw, NOW, openMeteoRaw, waqiRaw } from "../fixtures/payloads";
 
 describe("normalizer", () => {
@@ -10,7 +16,10 @@ describe("normalizer", () => {
     expect(n.pollutants.pm25).toBe(180.4);
   });
   it("leaves AQI null when the provider omits it (never derived)", () => {
-    const n = normalizeOpenMeteo({ ...openMeteoRaw, current: { ...openMeteoRaw.current, us_aqi: null } }, NOW);
+    const n = normalizeOpenMeteo(
+      { ...openMeteoRaw, current: { ...openMeteoRaw.current, us_aqi: null } },
+      NOW,
+    );
     expect(n.aqi).toBeNull();
   });
   it("WAQI keeps sub-indices out of concentrations", () => {
@@ -36,24 +45,52 @@ describe("normalizer", () => {
   const row = cpcbRaw.records[0];
   if (!row) throw new Error("Missing fixture");
   it("retains pollutants within 90 minutes and uses oldest retained timestamp", () => {
-    const n = normalizeCpcb({ records: [row, { ...row, pollutant_id: "PM10", last_update: "22-11-2026 15:30:00", avg_value: "310" }] }, DELHI_COORDS, NOW);
+    const n = normalizeCpcb(
+      {
+        records: [
+          row,
+          { ...row, pollutant_id: "PM10", last_update: "22-11-2026 15:30:00", avg_value: "310" },
+        ],
+      },
+      DELHI_COORDS,
+      NOW,
+    );
     expect(n?.pollutants.pm10).toBe(310);
     expect(n?.measuredAt).toBe("2026-11-22T10:00:00.000Z");
   });
   it("excludes per-pollutant timestamps more than 90 minutes apart", () => {
-    const n = normalizeCpcb({ records: [{ ...row, pollutant_id: "PM10", last_update: "22-11-2026 15:29:59", avg_value: "310" }, row] }, DELHI_COORDS, NOW);
+    const n = normalizeCpcb(
+      {
+        records: [
+          { ...row, pollutant_id: "PM10", last_update: "22-11-2026 15:29:59", avg_value: "310" },
+          row,
+        ],
+      },
+      DELHI_COORDS,
+      NOW,
+    );
     expect(n?.pollutants.pm25).toBe(201);
     expect(n?.pollutants.pm10).toBeNull();
     expect(n?.measuredAt).toBe("2026-11-22T11:30:00.000Z");
   });
   it("excludes stale rows even when their timestamps are within the comparability window", () => {
-    const n = normalizeCpcb({ records: [{ ...row, last_update: "22-11-2026 14:29:59" }, { ...row, pollutant_id: "PM10", last_update: "22-11-2026 15:00:00" }] }, DELHI_COORDS, NOW);
+    const n = normalizeCpcb(
+      {
+        records: [
+          { ...row, last_update: "22-11-2026 14:29:59" },
+          { ...row, pollutant_id: "PM10", last_update: "22-11-2026 15:00:00" },
+        ],
+      },
+      DELHI_COORDS,
+      NOW,
+    );
     expect(n?.pollutants.pm25).toBeNull();
     expect(n?.pollutants.pm10).toBe(201);
     expect(n?.measuredAt).toBe("2026-11-22T09:30:00.000Z");
   });
   it("rejects stations with only stale or invalid particulate timestamps", () => {
-    for (const last_update of ["22-11-2026 14:29:59", "invalid", "22-11-2026 18:00:00"]) expect(normalizeCpcb({ records: [{ ...row, last_update }] }, DELHI_COORDS, NOW)).toBeNull();
+    for (const last_update of ["22-11-2026 14:29:59", "invalid", "22-11-2026 18:00:00"])
+      expect(normalizeCpcb({ records: [{ ...row, last_update }] }, DELHI_COORDS, NOW)).toBeNull();
   });
 });
 

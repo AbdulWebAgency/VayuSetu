@@ -12,12 +12,28 @@ RULES:
 - basis: "Measured" for ground_station data, "Estimated" for model_estimate, "Qualitative" for general advice.
 - Output ONLY JSON: {"recommendations":[{"id","pillar","title","what","why","how","limitation","basis"}],"planner":{"morning":{"action","reason","pillar"},"afternoon":{...},"evening":{...}}}`;
 
-const esc = (s: string): string => s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c] ?? c);
+const esc = (s: string): string =>
+  s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c] ?? c);
 
 /** Builds the user turn: structured, escaped data blocks only. No free text from users is included. */
-export function buildUserPrompt(profile: HouseholdProfile, air: NormalizedAirQuality | null, baseline: Advisory, locationName: string): string {
+export function buildUserPrompt(
+  profile: HouseholdProfile,
+  air: NormalizedAirQuality | null,
+  baseline: Advisory,
+  locationName: string,
+): string {
   const env = air
-    ? { location: locationName, provider: air.providerName, measurement_type: air.measurementType, station: air.stationName, measured_at: air.measuredAt, aqi: air.aqi, pm_units: air.units, pollutants: air.pollutants, live_usable: baseline.liveDataAvailable }
+    ? {
+        location: locationName,
+        provider: air.providerName,
+        measurement_type: air.measurementType,
+        station: air.stationName,
+        measured_at: air.measuredAt,
+        aqi: air.aqi,
+        pm_units: air.units,
+        pollutants: air.pollutants,
+        live_usable: baseline.liveDataAvailable,
+      }
     : { location: locationName, live_usable: false, pollutants: null };
   const prof = { ...profile, has_air_purifier: profile.hasAirPurifier };
   return [

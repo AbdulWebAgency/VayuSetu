@@ -1,4 +1,5 @@
 ﻿# 🌿 VayuSetu — Urban Air Quality & Winter Smog Assistant
+
 <p align="center">
   <strong>Bridging the gap between environmental data and healthier everyday decisions.</strong>
 </p>
@@ -39,12 +40,15 @@ VayuSetu aims to bridge that gap by translating environmental information into u
 ## 🌱 Three core pillars
 
 ### 1. Low-emission daily routines
+
 Practical recommendations for adjusting daily activities based on environmental conditions, including commuting, outdoor activities and household routines.
 
 ### 2. Indoor air-quality guidance
+
 Guidance on ventilation, reducing indoor pollution sources and interpreting user-reported indoor PM2.5 readings.
 
 ### 3. Sustainable alternatives and impact
+
 Suggestions for more sustainable everyday choices, including alternatives that can help reduce individual and household contributions to pollution.
 
 Recommendations are designed to explain their reasoning rather than simply present instructions.
@@ -82,10 +86,10 @@ Provider availability can vary. The application preserves the provenance of the 
 
 Freshness is calculated using the provider's `measuredAt` timestamp, not the time the application fetched the data.
 
-| Data type | Live | Aging | Stale |
-|---|---:|---:|---:|
-| Ground station | ≤90 minutes | 91–180 minutes | >180 minutes |
-| Model data | ≤180 minutes | Not separately classified | >180 minutes |
+| Data type      |         Live |                     Aging |        Stale |
+| -------------- | -----------: | ------------------------: | -----------: |
+| Ground station |  ≤90 minutes |            91–180 minutes | >180 minutes |
+| Model data     | ≤180 minutes | Not separately classified | >180 minutes |
 
 Invalid measurement timestamps are treated as stale.
 
@@ -151,18 +155,18 @@ This avoids treating readings from different providers as interchangeable or sil
 
 The following are the principal application modules:
 
-| Directory / File | Responsibility |
-|---|---|
-| `src/routes/` | Application pages and public API endpoints |
-| `src/components/dashboard/` | Air-quality overview, household profile, daily planner and recommendations |
-| `src/components/common/` | Shared components such as error boundaries and severity badges |
-| `src/domain/` | Freshness, normalization, indoor comparisons, rule engine and output validation |
-| `src/server/providers/` | Environmental data providers, geocoding and provider hierarchy |
-| `src/server/gemini/` | Gemini client and prompt construction |
-| `src/server/security/` | Request validation and rate-limiting logic |
-| `src/server/advisoryService.ts` | Advisory generation and AI fallback orchestration |
-| `src/types/` | Shared TypeScript data types |
-| `tests/` | Unit, integration, component, contract and security tests |
+| Directory / File                | Responsibility                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------- |
+| `src/routes/`                   | Application pages and public API endpoints                                      |
+| `src/components/dashboard/`     | Air-quality overview, household profile, daily planner and recommendations      |
+| `src/components/common/`        | Shared components such as error boundaries and severity badges                  |
+| `src/domain/`                   | Freshness, normalization, indoor comparisons, rule engine and output validation |
+| `src/server/providers/`         | Environmental data providers, geocoding and provider hierarchy                  |
+| `src/server/gemini/`            | Gemini client and prompt construction                                           |
+| `src/server/security/`          | Request validation and rate-limiting logic                                      |
+| `src/server/advisoryService.ts` | Advisory generation and AI fallback orchestration                               |
+| `src/types/`                    | Shared TypeScript data types                                                    |
+| `tests/`                        | Unit, integration, component, contract and security tests                       |
 
 ---
 
@@ -208,11 +212,11 @@ The project includes automated tests covering the application’s domain logic, 
 
 ### Latest verified test results
 
-| Test category | Result |
-|---|---:|
-| Test files | 16 passed |
+| Test category    |     Result |
+| ---------------- | ---------: |
+| Test files       |  16 passed |
 | Individual tests | 111 passed |
-| Failed tests | 0 |
+| Failed tests     |          0 |
 
 **Command executed:**
 
@@ -234,14 +238,14 @@ Additional verification previously completed:
 
 VayuSetu is deployed on Vercel.
 
-| Configuration | Value |
-|---|---|
-| Hosting | Vercel |
-| Runtime | Node.js 24.x |
-| Region | Mumbai (`bom1`) |
-| Maximum function duration | 60 seconds |
-| Framework | TanStack Start |
-| Build tool | Vite |
+| Configuration             | Value           |
+| ------------------------- | --------------- |
+| Hosting                   | Vercel          |
+| Runtime                   | Node.js 24.x    |
+| Region                    | Mumbai (`bom1`) |
+| Maximum function duration | 60 seconds      |
+| Framework                 | TanStack Start  |
+| Build tool                | Vite            |
 
 The deployment configuration specifies Mumbai as the deployment region and a maximum function duration of 60 seconds.
 
@@ -281,13 +285,13 @@ DATA_GOV_IN_API_KEY=
 ALLOWED_ORIGINS=
 ```
 
-| Variable | Purpose |
-|---|---|
-| `GEMINI_API_KEY` | Optional Google Gemini API key for AI-enriched guidance |
-| `GEMINI_MODEL` | Optional Gemini model override |
-| `WAQI_API_TOKEN` | Optional WAQI ground-station data access |
-| `DATA_GOV_IN_API_KEY` | Optional CPCB data access through data.gov.in |
-| `ALLOWED_ORIGINS` | Optional comma-separated list of additional allowed origins |
+| Variable              | Purpose                                                     |
+| --------------------- | ----------------------------------------------------------- |
+| `GEMINI_API_KEY`      | Optional Google Gemini API key for AI-enriched guidance     |
+| `GEMINI_MODEL`        | Optional Gemini model override                              |
+| `WAQI_API_TOKEN`      | Optional WAQI ground-station data access                    |
+| `DATA_GOV_IN_API_KEY` | Optional CPCB data access through data.gov.in               |
+| `ALLOWED_ORIGINS`     | Optional comma-separated list of additional allowed origins |
 
 All secrets must remain server-side. Do not prefix these variables with `VITE_`.
 
@@ -340,19 +344,19 @@ Users should follow official health advisories during severe pollution events.
 
 ## 🛠️ Technology stack
 
-| Area | Technologies |
-|---|---|
-| Frontend | React 19, TypeScript |
-| Framework | TanStack Start, TanStack Router |
-| Styling | Tailwind CSS |
-| UI components | Radix UI, Lucide React |
-| Data fetching | TanStack Query |
-| Validation | Zod |
-| AI integration | Google Gemini |
-| Environmental data | CPCB, WAQI, Open-Meteo CAMS |
-| Build tooling | Vite |
-| Hosting | Vercel |
-| Testing | Vitest, Testing Library, Playwright |
+| Area               | Technologies                        |
+| ------------------ | ----------------------------------- |
+| Frontend           | React 19, TypeScript                |
+| Framework          | TanStack Start, TanStack Router     |
+| Styling            | Tailwind CSS                        |
+| UI components      | Radix UI, Lucide React              |
+| Data fetching      | TanStack Query                      |
+| Validation         | Zod                                 |
+| AI integration     | Google Gemini                       |
+| Environmental data | CPCB, WAQI, Open-Meteo CAMS         |
+| Build tooling      | Vite                                |
+| Hosting            | Vercel                              |
+| Testing            | Vitest, Testing Library, Playwright |
 
 ---
 
@@ -368,7 +372,7 @@ VayuSetu brings together environmental data, deterministic safety rules and AI-a
 
 ---
 
-*Built for PromptWars Virtual Challenge 06.*
+_Built for PromptWars Virtual Challenge 06._
 
 <p align="center">
   <strong>🌍 Better Awareness. Smarter Decisions. More Sustainable Living.</strong>

@@ -13,11 +13,20 @@ const STYLE: Record<Advisory["pm25Band"], { cls: string; Icon: typeof CheckCircl
 };
 
 /** Dual-encoded severity: icon + text category + numeric value (never colour alone). */
-export function SeverityBadge({ band, value }: { band: Advisory["pm25Band"]; value: number | null }) {
+export function SeverityBadge({
+  band,
+  value,
+}: {
+  band: Advisory["pm25Band"];
+  value: number | null;
+}) {
   const { cls, Icon } = STYLE[band];
-  const label = band === "unknown" ? "Unavailable" : PM25_BANDS.find((b) => b.band === band)?.label ?? band;
+  const label =
+    band === "unknown" ? "Unavailable" : (PM25_BANDS.find((b) => b.band === band)?.label ?? band);
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium text-primary-foreground ${cls}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium text-primary-foreground ${cls}`}
+    >
       <Icon className="h-4 w-4" aria-hidden />
       <span>{label}</span>
       {value !== null && <span>· {value} µg/m³</span>}

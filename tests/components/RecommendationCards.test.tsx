@@ -11,6 +11,13 @@ describe("RecommendationCards", () => {
     expect(screen.getByText("Indoor air-quality guidance")).toBeInTheDocument();
     expect(screen.getByText("Sustainable alternatives & impact")).toBeInTheDocument();
     const card = screen.getByRole("article", { name: a.recommendations[0]!.title });
-    for (const l of ["What to do", "Why it is recommended", "How it helps", "Limitation or trade-off", "Estimated"]) expect(within(card).getByText(l)).toBeInTheDocument();
+    for (const l of [
+      "What to do",
+      "Why it is recommended",
+      "How it helps",
+      "Limitation or trade-off",
+      "Estimated",
+    ])
+      expect(within(card).getByText(l)).toBeInTheDocument();
   });
 });

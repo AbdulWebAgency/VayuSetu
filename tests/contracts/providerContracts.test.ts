@@ -1,5 +1,14 @@
 import { NormalizedAirQualitySchema, ResolvedLocationSchema } from "@/types/airQuality";
-import { CpcbSchema, OpenMeteoAirSchema, OpenMeteoGeocodeSchema, WaqiSchema, normalizeCpcb, normalizeGeocode, normalizeOpenMeteo, normalizeWaqi } from "@/domain/normalizer";
+import {
+  CpcbSchema,
+  OpenMeteoAirSchema,
+  OpenMeteoGeocodeSchema,
+  WaqiSchema,
+  normalizeCpcb,
+  normalizeGeocode,
+  normalizeOpenMeteo,
+  normalizeWaqi,
+} from "@/domain/normalizer";
 import { cpcbRaw, DELHI, geocodeRaw, NOW, openMeteoRaw, waqiRaw } from "../fixtures/payloads";
 
 describe("provider contracts", () => {
@@ -10,9 +19,14 @@ describe("provider contracts", () => {
     expect(OpenMeteoGeocodeSchema.safeParse(geocodeRaw).success).toBe(true);
   });
   it("normalized outputs satisfy NormalizedAirQualitySchema", () => {
-    for (const n of [normalizeOpenMeteo(openMeteoRaw, NOW), normalizeWaqi(waqiRaw, NOW), normalizeCpcb(cpcbRaw, DELHI.coordinates, NOW)])
+    for (const n of [
+      normalizeOpenMeteo(openMeteoRaw, NOW),
+      normalizeWaqi(waqiRaw, NOW),
+      normalizeCpcb(cpcbRaw, DELHI.coordinates, NOW),
+    ])
       expect(NormalizedAirQualitySchema.safeParse(n).success).toBe(true);
-    for (const l of normalizeGeocode(geocodeRaw)) expect(ResolvedLocationSchema.safeParse(l).success).toBe(true);
+    for (const l of normalizeGeocode(geocodeRaw))
+      expect(ResolvedLocationSchema.safeParse(l).success).toBe(true);
   });
   it("malformed payloads are rejected", () => {
     expect(() => normalizeOpenMeteo({ current: {} }, NOW)).toThrow();

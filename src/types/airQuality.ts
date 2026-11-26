@@ -36,7 +36,9 @@ export const ProviderIdSchema = z.enum(["CPCB", "WAQI", "OPEN_METEO"]).describe(
 export const MeasurementTypeSchema = z
   .enum(["ground_station", "model_estimate"])
   .describe("Ground-Station Observation vs Atmospheric Model Estimate");
-export const AqiScaleSchema = z.enum(["US_EPA", "IN_NAQI"]).describe("AQI scale supplied by provider");
+export const AqiScaleSchema = z
+  .enum(["US_EPA", "IN_NAQI"])
+  .describe("AQI scale supplied by provider");
 export const FreshnessSchema = z.enum(["live", "aging", "stale"]);
 
 const conc = z.number().nonnegative().nullable();
@@ -57,7 +59,9 @@ export const NormalizedAirQualitySchema = z.object({
   measurementType: MeasurementTypeSchema,
   stationId: z.string().nullable(),
   stationName: z.string().nullable(),
-  dataCoordinates: z.object({ lat: z.number(), lon: z.number() }).describe("Station or model grid coordinates"),
+  dataCoordinates: z
+    .object({ lat: z.number(), lon: z.number() })
+    .describe("Station or model grid coordinates"),
   measuredAt: z.string().datetime().describe("Provider's original measurement timestamp"),
   fetchedAt: z.string().datetime().describe("When this server fetched the data"),
   aqi: z
@@ -71,8 +75,16 @@ export const NormalizedAirQualitySchema = z.object({
 export type NormalizedAirQuality = z.infer<typeof NormalizedAirQualitySchema>;
 
 export const AirQualityResponseSchema = z.discriminatedUnion("status", [
-  z.object({ status: z.literal("ok"), data: NormalizedAirQualitySchema, attempted: z.array(z.string()) }),
-  z.object({ status: z.literal("unavailable"), message: z.string(), attempted: z.array(z.string()) }),
+  z.object({
+    status: z.literal("ok"),
+    data: NormalizedAirQualitySchema,
+    attempted: z.array(z.string()),
+  }),
+  z.object({
+    status: z.literal("unavailable"),
+    message: z.string(),
+    attempted: z.array(z.string()),
+  }),
 ]);
 export type AirQualityResponse = z.infer<typeof AirQualityResponseSchema>;
 
@@ -81,7 +93,13 @@ export const HouseholdProfileSchema = z.object({
   youngChildren: z.boolean(),
   elderly: z.boolean(),
   respiratorySensitivity: z.boolean(),
-  commuteMode: z.enum(["private_car", "two_wheeler", "public_transit", "walk_cycle", "work_from_home"]),
+  commuteMode: z.enum([
+    "private_car",
+    "two_wheeler",
+    "public_transit",
+    "walk_cycle",
+    "work_from_home",
+  ]),
   commuteWindow: z.enum(["morning_peak", "midday", "evening_peak", "flexible"]),
   exerciseRoutine: z.enum(["morning_outdoor", "evening_outdoor", "indoor_only", "none"]),
   hasAirPurifier: z.boolean(),
@@ -108,7 +126,11 @@ export const RecommendationSchema = z.object({
 });
 export type Recommendation = z.infer<typeof RecommendationSchema>;
 
-export const PlannerSlotSchema = z.object({ action: text(300), reason: text(300), pillar: PillarSchema });
+export const PlannerSlotSchema = z.object({
+  action: text(300),
+  reason: text(300),
+  pillar: PillarSchema,
+});
 export const PlannerSchema = z.object({
   morning: PlannerSlotSchema,
   afternoon: PlannerSlotSchema,

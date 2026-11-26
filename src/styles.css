@@ -136,9 +136,21 @@
 }
 
 @layer base {
-  body { font-family: var(--family-sans); background-image: var(--haze); background-attachment: fixed; }
-  h1, h2, h3 { font-family: var(--family-display); letter-spacing: -0.01em; }
-  :focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+  body {
+    font-family: var(--family-sans);
+    background-image: var(--haze);
+    background-attachment: fixed;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--family-display);
+    letter-spacing: -0.01em;
+  }
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
 }
 
 @utility card-surface {
