@@ -140,6 +140,43 @@ const haversineKm = (a: { lat: number; lon: number }, b: { lat: number; lon: num
 };
 export { haversineKm };
 
+const CPCB_MAX_ROW_AGE_MS = 180 * 60_000;
+const CPCB_COMPARABILITY_WINDOW_MS = 90 * 60_000;
+
+type CpcbRow = z.infer<typeof CpcbRecordSchema>;
+
+function retainComparableCpcbReadings(rows: CpcbRow[], now: Date) {
+  const timed = rows
+    .flatMap((row) => {
+      const time = parseCpcbTime(row.last_update)?.getTime();
+      const value = Number(row.avg_value);
+      if (
+        time === undefined ||
+        time > now.getTime() ||
+        now.getTime() - time > CPCB_MAX_ROW_AGE_MS ||
+        !Number.isFinite(value) ||
+        value < 0 ||
+        !["PM2.5", "PM10", "NO2", "SO2", "OZONE"].includes(row.pollutant_id.toUpperCase()) ||
+        String(row.avg_value).trim() === ""
+      )
+        return [];
+      return [{ row, time, value }];
+    })
+    .sort((a, b) => b.time - a.time);
+  const newest = timed[0];
+  if (!newest) return [];
+  const retained = timed.filter((r) => newest.time - r.time <= CPCB_COMPARABILITY_WINDOW_MS);
+  // Keep only the newest retained reading for each pollutant.
+  const seen = new Set<string>();
+  const comparable = retained.filter(({ row }) => {
+    const id = row.pollutant_id.toUpperCase();
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  return seen.has("PM2.5") || seen.has("PM10") ? comparable : [];
+}
+
 /** Picks the nearest CPCB station (≤ maxKm) and normalizes its pollutant rows. CPCB OGD supplies no AQI. */
 export function normalizeCpcb(
   raw: unknown,
@@ -149,68 +186,30 @@ export function normalizeCpcb(
   now = fetchedAt,
 ): NormalizedAirQuality | null {
   const rows = CpcbSchema.parse(raw).records;
-  const byStation = new Map<string, z.infer<typeof CpcbRecordSchema>[]>();
+  const byStation = new Map<string, CpcbRow[]>();
   for (const r of rows) byStation.set(r.station, [...(byStation.get(r.station) ?? []), r]);
   let best: {
     name: string;
-    rows: z.infer<typeof CpcbRecordSchema>[];
+    readings: ReturnType<typeof retainComparableCpcbReadings>;
     km: number;
     lat: number;
     lon: number;
   } | null = null;
   for (const [name, list] of byStation) {
-    const timed = list
-      .flatMap((row) => {
-        const time = parseCpcbTime(row.last_update)?.getTime();
-        const value = Number(row.avg_value);
-        if (
-          time === undefined ||
-          time > now.getTime() ||
-          now.getTime() - time > 180 * 60_000 ||
-          !Number.isFinite(value) ||
-          value < 0 ||
-          !["PM2.5", "PM10", "NO2", "SO2", "OZONE"].includes(row.pollutant_id.toUpperCase()) ||
-          String(row.avg_value).trim() === ""
-        )
-          return [];
-        return [{ row, time }];
-      })
-      .sort((a, b) => b.time - a.time);
-    const newest = timed[0];
-    if (!newest) continue;
-    const retained = timed.filter((r) => newest.time - r.time <= 90 * 60_000);
-    // Keep only the newest retained reading for each pollutant.
-    const seen = new Set<string>();
-    const comparable = retained
-      .filter(({ row }) => {
-        const id = row.pollutant_id.toUpperCase();
-        if (seen.has(id)) return false;
-        seen.add(id);
-        return true;
-      })
-      .map(({ row }) => row);
-    if (!seen.has("PM2.5") && !seen.has("PM10")) continue;
-    const first = comparable[0];
+    const readings = retainComparableCpcbReadings(list, now);
+    const first = readings[0];
     if (!first) continue;
-    const lat = Number(first.latitude),
-      lon = Number(first.longitude);
+    const lat = Number(first.row.latitude),
+      lon = Number(first.row.longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
     const km = haversineKm(target, { lat, lon });
-    if (km <= maxKm && (!best || km < best.km)) best = { name, rows: comparable, km, lat, lon };
+    if (km <= maxKm && (!best || km < best.km)) best = { name, readings, km, lat, lon };
   }
-  if (!best || !best.rows[0]) return null;
-  const station = best;
-  const times = station.rows.flatMap((r) => {
-    const t = parseCpcbTime(r.last_update);
-    return t ? [t.getTime()] : [];
-  });
-  if (!times.length) return null;
-  const measured = new Date(Math.min(...times));
-  const readPollutantAverage = (id: string): number | null => {
-    const r = station.rows.find((x) => x.pollutant_id.toUpperCase() === id);
-    const n = r ? Number(r.avg_value) : NaN;
-    return Number.isFinite(n) && n >= 0 ? n : null;
-  };
+  if (!best) return null;
+  const { readings } = best;
+  const measured = new Date(Math.min(...readings.map(({ time }) => time)));
+  const readPollutantAverage = (id: string): number | null =>
+    readings.find(({ row }) => row.pollutant_id.toUpperCase() === id)?.value ?? null;
   const pollutants = {
     pm25: readPollutantAverage("PM2.5"),
     pm10: readPollutantAverage("PM10"),
@@ -219,7 +218,6 @@ export function normalizeCpcb(
     o3: readPollutantAverage("OZONE"),
     co: null,
   };
-  if (pollutants.pm25 === null && pollutants.pm10 === null) return null;
   return {
     provider: "CPCB",
     providerName: PROVIDER_LABEL.CPCB,

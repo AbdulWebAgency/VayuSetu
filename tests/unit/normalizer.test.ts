@@ -1,4 +1,5 @@
 import {
+  haversineKm,
   normalizeCpcb,
   normalizeGeocode,
   normalizeOpenMeteo,
@@ -91,6 +92,88 @@ describe("normalizer", () => {
   it("rejects stations with only stale or invalid particulate timestamps", () => {
     for (const last_update of ["22-11-2026 14:29:59", "invalid", "22-11-2026 18:00:00"])
       expect(normalizeCpcb({ records: [{ ...row, last_update }] }, DELHI_COORDS, NOW)).toBeNull();
+  });
+  it("includes a station exactly 25 km away and rejects one just outside", () => {
+    const origin = { lat: 0, lon: 0 };
+    const latitude = (25 / 6371) * (180 / Math.PI);
+    const outside = latitude + 0.000001;
+    expect(haversineKm(origin, { lat: latitude, lon: 0 })).toBe(25);
+    expect(haversineKm(origin, { lat: outside, lon: 0 })).toBeGreaterThan(25);
+    const station = { ...row, latitude, longitude: 0 };
+    expect(normalizeCpcb({ records: [station] }, origin, NOW)?.stationId).toBe(row.station);
+    expect(normalizeCpcb({ records: [{ ...station, latitude: outside }] }, origin, NOW)).toBeNull();
+  });
+  it("uses the eligibility clock for the inclusive 180-minute row limit", () => {
+    const raw = { records: [{ ...row, last_update: "22-11-2026 14:30:00" }] };
+    const fetchedAt = new Date("2026-11-22T11:50:00Z");
+    expect(normalizeCpcb(raw, DELHI_COORDS, fetchedAt, 25, NOW)).toMatchObject({
+      measuredAt: "2026-11-22T09:00:00.000Z",
+      fetchedAt: fetchedAt.toISOString(),
+    });
+    const later = new Date(NOW.getTime() + 1000);
+    expect(normalizeCpcb(raw, DELHI_COORDS, fetchedAt, 25, later)).toBeNull();
+  });
+  it("replaces a farther eligible station and keeps the first station at equal distance", () => {
+    const near = {
+      ...row,
+      station: "Near",
+      latitude: DELHI_COORDS.lat,
+      longitude: DELHI_COORDS.lon,
+    };
+    const records = [
+      row,
+      { ...row, pollutant_id: "SO2" },
+      { ...near, avg_value: "17.125" },
+      { ...near, station: "Tied", avg_value: "99" },
+    ];
+    expect(normalizeCpcb({ records }, DELHI_COORDS, NOW)).toMatchObject({
+      stationId: "Near",
+      dataCoordinates: DELHI_COORDS,
+      pollutants: { pm25: 17.125, so2: null },
+    });
+  });
+  it("requires a valid particulate and preserves a zero PM10 reading", () => {
+    const gas = { ...row, pollutant_id: "NO2" };
+    expect(normalizeCpcb({ records: [gas] }, DELHI_COORDS, NOW)).toBeNull();
+    for (const avg_value of ["", "  ", "invalid", "-1"]) {
+      expect(
+        normalizeCpcb({ records: [gas, { ...row, avg_value }] }, DELHI_COORDS, NOW),
+      ).toBeNull();
+    }
+    const zero = { ...row, pollutant_id: "PM10", avg_value: "0" };
+    expect(normalizeCpcb({ records: [gas, zero] }, DELHI_COORDS, NOW)?.pollutants).toMatchObject({
+      pm25: null,
+      pm10: 0,
+    });
+  });
+  it("keeps the first tied reading per pollutant and dates only the retained readings", () => {
+    const records = [
+      { ...row, last_update: "22-11-2026 16:00:00", avg_value: "90" },
+      { ...row, pollutant_id: "pm2.5", avg_value: "15" },
+      row,
+      { ...row, pollutant_id: "NO2", last_update: "22-11-2026 16:30:00", avg_value: "33" },
+    ];
+    expect(normalizeCpcb({ records }, DELHI_COORDS, NOW)).toMatchObject({
+      pollutants: { pm25: 15, no2: 33 },
+      measuredAt: "2026-11-22T11:00:00.000Z",
+    });
+  });
+  it("anchors the station window to its newest usable gas reading before requiring PM", () => {
+    const near = {
+      ...row,
+      station: "Near",
+      latitude: DELHI_COORDS.lat,
+      longitude: DELHI_COORDS.lon,
+    };
+    const records = [
+      { ...near, pollutant_id: "NO2" },
+      { ...near, last_update: "22-11-2026 15:29:59" },
+      row,
+    ];
+    expect(normalizeCpcb({ records }, DELHI_COORDS, NOW)).toMatchObject({
+      stationId: row.station,
+      pollutants: { no2: null, pm25: 201 },
+    });
   });
 });
 
