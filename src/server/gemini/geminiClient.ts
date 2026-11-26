@@ -1,8 +1,10 @@
 import { AiAdvisoryResponseSchema, type AiAdvisoryResponse } from "@/types/airQuality";
 import { fetchJson, UpstreamError } from "../providers/http";
 
+const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
+
 /** Default primary model; override at runtime via GEMINI_MODEL env variable (server-only, never VITE_*). */
-export const GEMINI_MODEL = (process.env["GEMINI_MODEL"] ?? "gemini-3.5-flash-lite").trim();
+export const GEMINI_MODEL = process.env["GEMINI_MODEL"]?.trim() || DEFAULT_GEMINI_MODEL;
 
 const FALLBACK_MODELS = ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemma-4-31b-it"];
 
@@ -62,7 +64,9 @@ export async function callGemini(
   system: string,
   user: string,
 ): Promise<AiAdvisoryResponse> {
-  const primary = (process.env["GEMINI_MODEL"] ?? GEMINI_MODEL).trim();
+  const configuredModel = process.env["GEMINI_MODEL"];
+  const primary =
+    configuredModel === undefined ? GEMINI_MODEL : configuredModel.trim() || DEFAULT_GEMINI_MODEL;
   const models = Array.from(new Set([primary, ...FALLBACK_MODELS]));
   let lastError: unknown;
   for (const model of models) {
