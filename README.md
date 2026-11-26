@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/Challenge-PromptWars%20Virtual%20Challenge%2006-blue?style=for-the-badge" alt="PromptWars Challenge 06"/>
   <img src="https://img.shields.io/badge/Framework-TanStack%20Start-FF4154?style=for-the-badge" alt="TanStack Start"/>
   <img src="https://img.shields.io/badge/AI-Google%20Gemini-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white" alt="Google Gemini"/>
-  <img src="https://img.shields.io/badge/Tests-111%20Passing-brightgreen?style=for-the-badge" alt="111 Passing Tests"/>
+  <img src="https://img.shields.io/badge/Tests-126%20Passing-brightgreen?style=for-the-badge" alt="126 Passing Tests"/>
 </p>
 
 <p align="center">
@@ -160,9 +160,12 @@ The following are the principal application modules:
 | `src/routes/`                   | Application pages and public API endpoints                                      |
 | `src/components/dashboard/`     | Air-quality overview, household profile, daily planner and recommendations      |
 | `src/components/common/`        | Shared components such as error boundaries and severity badges                  |
+| `src/hooks/`                    | Application hooks, including household profile state                            |
+| `src/lib/`                      | Public API client and shared utilities                                          |
 | `src/domain/`                   | Freshness, normalization, indoor comparisons, rule engine and output validation |
 | `src/server/providers/`         | Environmental data providers, geocoding and provider hierarchy                  |
 | `src/server/gemini/`            | Gemini client and prompt construction                                           |
+| `src/server/cache/`             | Best-effort per-instance fetch cache                                            |
 | `src/server/security/`          | Request validation and rate-limiting logic                                      |
 | `src/server/advisoryService.ts` | Advisory generation and AI fallback orchestration                               |
 | `src/types/`                    | Shared TypeScript data types                                                    |
@@ -214,8 +217,8 @@ The project includes automated tests covering the application’s domain logic, 
 
 | Test category    |     Result |
 | ---------------- | ---------: |
-| Test files       |  16 passed |
-| Individual tests | 111 passed |
+| Test files       |  17 passed |
+| Individual tests | 126 passed |
 | Failed tests     |          0 |
 
 **Command executed:**
@@ -224,19 +227,19 @@ The project includes automated tests covering the application’s domain logic, 
 npm test
 ```
 
-**Result:** All 16 test files and all 111 tests passed.
+**Result:** All 17 test files and all 126 tests passed.
 
-Additional verification previously completed:
+Additional local verification:
 
-- Production build completed successfully.
-- Vercel deployment configuration was checked.
-- The deployed application was verified at the production URL.
+- The production build succeeded and its generated Vercel function configuration was checked locally.
+- Authored ESLint reported zero errors and zero warnings, with vendor UI primitives and the generated route tree excluded from that check.
+- Full-checkout ESLint reported zero errors and six existing Fast Refresh warnings in vendor UI primitives.
 
 ---
 
 ## 🚀 Deployment
 
-VayuSetu is deployed on Vercel.
+The following settings were verified in the local Vercel production build.
 
 | Configuration             | Value           |
 | ------------------------- | --------------- |
@@ -247,7 +250,7 @@ VayuSetu is deployed on Vercel.
 | Framework                 | TanStack Start  |
 | Build tool                | Vite            |
 
-The deployment configuration specifies Mumbai as the deployment region and a maximum function duration of 60 seconds.
+The root `vercel.json` declares region `bom1` (Mumbai). The `npm run build` post-step writes that region and the 60-second maximum duration into the generated function configuration. These settings describe the local build output.
 
 ---
 
@@ -323,7 +326,9 @@ npm run test:e2e
 npm run test:smoke
 ```
 
-The smoke-test script uses Bun, so Bun must be installed to run it. Playwright browser installation may also be required before running the end-to-end tests.
+Local development uses `npm run dev`. The live smoke-test script requires Bun. By default, Playwright uses `bun run dev` to manage its development server and requires a compatible browser. Set `E2E_BASE_URL` to point Playwright at an already running server instead.
+
+The Playwright development-server hydration failure remains unresolved and E2E verification is deferred to Phase 8. Mocked Vitest runs exercise the local advisory pipeline with test responses.
 
 ---
 
@@ -371,8 +376,6 @@ VayuSetu brings together environmental data, deterministic safety rules and AI-a
 **VayuSetu — Better air awareness. Smarter everyday choices.** 🌱
 
 ---
-
-_Built for PromptWars Virtual Challenge 06._
 
 <p align="center">
   <strong>🌍 Better Awareness. Smarter Decisions. More Sustainable Living.</strong>

@@ -53,6 +53,20 @@ export const PollutantsSchema = z.object({
 });
 export type Pollutants = z.infer<typeof PollutantsSchema>;
 
+/**
+ * Normalized outdoor air data from one provider. Attribution and data coordinates
+ * identify a ground station or a model grid. A grid estimate has different
+ * provenance from a station observation, and both describe outdoor conditions.
+ *
+ * Freshness uses measuredAt, the provider measurement or model time. CPCB
+ * reports the oldest retained pollutant time. fetchedAt records server retrieval
+ * and keeps that value when the server serves a cached payload.
+ *
+ * The Zod schema validates the normalized shape at runtime when parsed, and
+ * NormalizedAirQuality is inferred from it. Missing concentrations are null.
+ * AQI is provider-supplied, labeled with its scale, and null when unavailable.
+ * A PM2.5 concentration band is separate from AQI.
+ */
 export const NormalizedAirQualitySchema = z.object({
   provider: ProviderIdSchema,
   providerName: z.string().describe("Human readable provider attribution"),

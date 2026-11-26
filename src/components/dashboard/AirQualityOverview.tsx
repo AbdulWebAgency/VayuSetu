@@ -130,41 +130,41 @@ export function AirQualityOverview({
                 </div>
               ))}
             </dl>
-            <dl className="grid gap-x-6 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
-              <div>
-                <dt className="inline font-semibold">Provider: </dt>
-                <dd className="inline">{data.providerName}</dd>
-              </div>
-              {data.agency && (
+            <div className="grid gap-y-1 text-xs text-muted-foreground">
+              <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
                 <div>
-                  <dt className="inline font-semibold">Agency: </dt>
-                  <dd className="inline">{data.agency}</dd>
+                  <dt className="inline font-semibold">Provider: </dt>
+                  <dd className="inline">{data.providerName}</dd>
                 </div>
-              )}
-              <div>
-                <dt className="inline font-semibold">
-                  {data.stationName ? "Station: " : "Model grid: "}
-                </dt>
-                <dd className="inline">
-                  {data.stationName
-                    ? `${data.stationName} (${data.stationId})`
-                    : `${data.dataCoordinates.lat.toFixed(3)}, ${data.dataCoordinates.lon.toFixed(3)}`}
-                </dd>
-              </div>
-              <div>
-                <dt className="inline font-semibold">Measured at: </dt>
-                <dd className="inline">{formatTimestamp(data.measuredAt)}</dd>
-              </div>
-              <div>
-                <dt className="inline font-semibold">Fetched at: </dt>
-                <dd className="inline">{formatTimestamp(data.fetchedAt)}</dd>
-              </div>
+                {data.agency && (
+                  <div>
+                    <dt className="inline font-semibold">Agency: </dt>
+                    <dd className="inline">{data.agency}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="inline font-semibold">
+                    {data.stationName ? "Station: " : "Model grid: "}
+                  </dt>
+                  <dd className="inline">
+                    {data.stationName
+                      ? `${data.stationName} (${data.stationId})`
+                      : `${data.dataCoordinates.lat.toFixed(3)}, ${data.dataCoordinates.lon.toFixed(3)}`}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="inline font-semibold">Measured at: </dt>
+                  <dd className="inline">{formatTimestamp(data.measuredAt)}</dd>
+                </div>
+                <div>
+                  <dt className="inline font-semibold">Fetched at: </dt>
+                  <dd className="inline">{formatTimestamp(data.fetchedAt)}</dd>
+                </div>
+              </dl>
               {data.notes.map((n) => (
-                <p key={n} className="sm:col-span-2">
-                  {n}
-                </p>
+                <p key={n}>{n}</p>
               ))}
-            </dl>
+            </div>
           </>
         )}
       </div>

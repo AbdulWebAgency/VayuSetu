@@ -18,6 +18,29 @@ describe("AirQualityOverview", () => {
     expect(screen.getByTestId("freshness")).toHaveTextContent("Live");
     expect(screen.getByText("General Indoor Air-Quality Guidance")).toBeInTheDocument();
   });
+  it("renders provider notes in order outside the provenance description list", () => {
+    const notes = ["First provider note", "Second provider note"];
+    render(
+      <AirQualityOverview
+        air={{ status: "ok", data: air({ notes }), attempted: [] }}
+        loading={false}
+        locationName="Delhi"
+        profile={profile()}
+        now={NOW}
+      />,
+    );
+
+    const first = screen.getByText("First provider note", { selector: "p" });
+    const second = screen.getByText("Second provider note", { selector: "p" });
+    expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(first.closest("dl")).toBeNull();
+    expect(second.closest("dl")).toBeNull();
+
+    const label = screen.getByText("Provider:", { selector: "dt" });
+    const value = screen.getByText("Model", { selector: "dd" });
+    expect(label.nextElementSibling).toBe(value);
+    expect(label.parentElement?.parentElement?.tagName).toBe("DL");
+  });
   it("marks AQI unavailable when provider omits it", () => {
     render(
       <AirQualityOverview
