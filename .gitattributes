@@ -1,0 +1,9 @@
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.js   text eol=lf
+*.css  text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+
+src/components/ui/** !text !eol
+src/routeTree.gen.ts !text !eol
