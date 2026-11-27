@@ -107,3 +107,54 @@ describe("provider fallback waterfall (CPCB -> WAQI -> Open-Meteo)", () => {
     ]);
   });
 });
+
+describe("environmental values", () => {
+  it("continues past an empty WAQI response", async () => {
+    const { normalizeWaqi } = await import("@/domain/normalizer");
+    const { waqiRaw } = await import("../fixtures/payloads");
+    const empty = normalizeWaqi({ ...waqiRaw, data: { ...waqiRaw.data, aqi: "-" } }, NOW);
+    const model = air();
+    const result = await resolveAirQuality(DELHI, {
+      waqiToken: "fixture",
+      waqi: async () => empty,
+      openMeteo: async () => model,
+      now: () => NOW,
+    });
+    expect(result).toMatchObject({
+      status: "ok",
+      data: model,
+      attempted: [
+        "CPCB: not configured",
+        "WAQI: no usable environmental values",
+        "Open-Meteo: used",
+      ],
+    });
+  });
+
+  it("retains AQI-only WAQI with a genuine zero", async () => {
+    const { normalizeWaqi } = await import("@/domain/normalizer");
+    const { waqiRaw } = await import("../fixtures/payloads");
+    const data = normalizeWaqi({ ...waqiRaw, data: { ...waqiRaw.data, aqi: 0 } }, NOW);
+    const openMeteo = vi.fn();
+    const result = await resolveAirQuality(DELHI, {
+      waqiToken: "fixture",
+      waqi: async () => data,
+      openMeteo,
+      now: () => NOW,
+    });
+    expect(result).toMatchObject({ status: "ok", data: { provider: "WAQI", aqi: { value: 0 } } });
+    expect(openMeteo).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty final model", async () => {
+    const { normalizeOpenMeteo } = await import("@/domain/normalizer");
+    const { openMeteoRaw } = await import("../fixtures/payloads");
+    const data = normalizeOpenMeteo(
+      { ...openMeteoRaw, current: { time: openMeteoRaw.current.time } },
+      NOW,
+    );
+    const result = await resolveAirQuality(DELHI, { openMeteo: async () => data, now: () => NOW });
+    expect(result.status).toBe("unavailable");
+    expect(result.attempted.at(-1)).toBe("Open-Meteo: no usable environmental values");
+  });
+});

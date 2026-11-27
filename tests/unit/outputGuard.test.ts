@@ -159,3 +159,21 @@ describe("output guard", () => {
     expect(rejectReason(text, p)).not.toBeNull();
   });
 });
+
+it("characterizes the open Gemini planner consistency gap under high outdoor pollution", () => {
+  const household = profile({ youngChildren: true });
+  const baseline = runRuleEngine(air(), household, NOW);
+  const afternoon = {
+    action: "Play outdoors this afternoon.",
+    reason: "Enjoy the afternoon.",
+    pillar: "routines" as const,
+  };
+  const result = guardAiAdvisory(
+    { recommendations: baseline.recommendations, planner: { ...baseline.planner, afternoon } },
+    household,
+    baseline,
+    air(),
+    NOW,
+  );
+  expect(result.planner.afternoon).toEqual(afternoon);
+});

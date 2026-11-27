@@ -296,3 +296,24 @@ describe("advisory pipeline", () => {
     }
   });
 });
+
+it("keeps normalized PM10-only CPCB data and gives precautionary guidance", async () => {
+  const { normalizeCpcb } = await import("@/domain/normalizer");
+  const { cpcbRaw, DELHI, NOW, profile } = await import("../fixtures/payloads");
+  const records = cpcbRaw.records
+    .filter((row) => row.pollutant_id === "PM10")
+    .map((row) => ({ ...row, avg_value: "0" }));
+  const data = normalizeCpcb({ records }, DELHI.coordinates, NOW);
+  const openMeteo = vi.fn();
+  const result = await buildAdvisory(
+    { location: DELHI, profile: profile() },
+    { cpcbKey: "fixture", cpcb: async () => data, openMeteo, now: () => NOW },
+  );
+  expect(result.air).toMatchObject({
+    status: "ok",
+    data: { provider: "CPCB", pollutants: { pm10: 0 } },
+  });
+  expect(openMeteo).not.toHaveBeenCalled();
+  expect(result.advisory.liveDataAvailable).toBe(true);
+  expect(result.advisory.ventilation).toMatch(/insufficient/i);
+});

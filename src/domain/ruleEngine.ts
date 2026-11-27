@@ -5,7 +5,8 @@ import type {
   Planner,
   Recommendation,
 } from "@/types/airQuality";
-import { PM25_BANDS } from "./catalogues";
+import { hasEnvironmentalValue } from "./outdoorEvidence";
+import { AQI_SCALE_LABEL, PM25_BANDS } from "./catalogues";
 import { computeFreshness } from "./freshness";
 import { compareIndoorOutdoor, type IndoorComparison } from "./indoorComparison";
 
@@ -29,7 +30,7 @@ export interface RuleContext {
   usable: boolean;
   band: Band;
   tier: Advisory["sensitivityTier"];
-  high: boolean;
+  outdoorCondition: "high" | "lower" | "unknown";
   basis: Basis;
   indoor: IndoorComparison;
 }
@@ -40,45 +41,87 @@ export function buildContext(
   p: HouseholdProfile,
   now = new Date(),
 ): RuleContext {
-  const usable = !!air && computeFreshness(air.measuredAt, air.measurementType, now) !== "stale";
-  const band = usable ? pm25Band(air!.pollutants.pm25) : "unknown";
-  const aqiHigh = usable && air!.aqi !== null && air!.aqi.value > 150;
-  const high = aqiHigh || ["poor", "very_poor", "severe"].includes(band);
-  const basis: Basis = !usable
+  const current =
+    air &&
+    computeFreshness(air.measuredAt, air.measurementType, now) !== "stale" &&
+    hasEnvironmentalValue(air)
+      ? air
+      : null;
+  const band = pm25Band(current?.pollutants.pm25 ?? null);
+  const aqi = current?.aqi ?? null;
+  const high = (aqi !== null && aqi.value > 150) || ["poor", "very_poor", "severe"].includes(band);
+  const outdoorCondition = high ? "high" : aqi !== null || band !== "unknown" ? "lower" : "unknown";
+  const basis: Basis = !current
     ? "Qualitative"
-    : air!.measurementType === "ground_station"
+    : current.measurementType === "ground_station"
       ? "Measured"
       : "Estimated";
   return {
-    air,
-    usable,
+    air: current,
+    usable: current !== null,
     band,
     tier: sensitivityTier(p),
-    high,
+    outdoorCondition,
     basis,
-    indoor: compareIndoorOutdoor(p, air, now),
+    indoor: compareIndoorOutdoor(p, current, now),
   };
 }
 
 function ventilation(c: RuleContext): string {
-  if (c.indoor.status === "comparable" && c.indoor.indoorHigher)
-    return "Your reported indoor PM2.5 is above the outdoor reading taken around the same time — likely an indoor source. Short, cross-ventilation bursts can help once the source (cooking, incense, smoke) is stopped.";
-  if (!c.usable)
-    return "Live outdoor data unavailable: keep windows mostly closed during traffic peaks and ventilate briefly after cooking.";
-  if (c.high)
-    return "Outdoor particle levels are high: keep windows closed during peaks and ventilate in short bursts only to clear cooking fumes or humidity.";
-  return "Outdoor particle levels are lower right now: a 10–15 minute cross-ventilation window is reasonable, ideally away from road-facing sides.";
+  const indoorHigher = c.indoor.status === "comparable" && c.indoor.indoorHigher;
+  if (c.outdoorCondition === "high") {
+    const precaution =
+      "Outdoor pollution indicators are high. Keep windows closed during peaks and ventilate briefly only as needed to clear indoor fumes or humidity.";
+    return indoorHigher
+      ? `${precaution} Your reported indoor PM2.5 is higher still. Stop indoor smoke sources and use kitchen exhaust while cooking.`
+      : precaution;
+  }
+  if (c.outdoorCondition === "unknown") {
+    const evidence = c.usable
+      ? "Available outdoor readings are insufficient to determine ventilation timing."
+      : "Live outdoor data unavailable.";
+    return `${evidence} Control indoor smoke sources, use kitchen exhaust while cooking and ventilate briefly as needed.`;
+  }
+  if (indoorHigher)
+    return "Your reported indoor PM2.5 is higher than the comparable outdoor reading. Stop indoor smoke sources and consider brief cross-ventilation if local conditions allow.";
+  return "The available outdoor indicators are below the high category. Consider brief cross-ventilation if local conditions allow and recheck readings before ventilating later.";
 }
 
 const describeOutdoorEvidence = (c: RuleContext, extra: string): string => {
-  const pm =
-    c.usable && c.air?.pollutants.pm25 != null
-      ? `Outdoor PM2.5 ${c.air.pollutants.pm25} µg/m³ (${c.basis.toLowerCase()})`
-      : "No verified live outdoor reading";
-  return `${pm}. ${extra}`;
+  if (!c.air) return `No verified live outdoor reading. ${extra}`;
+  const evidence: string[] = [];
+  if (c.air.pollutants.pm25 !== null)
+    evidence.push(`Outdoor PM2.5 ${c.air.pollutants.pm25} µg/m³ (${c.band})`);
+  if (c.air.aqi) evidence.push(`${AQI_SCALE_LABEL[c.air.aqi.scale]} ${c.air.aqi.value}`);
+  return `${evidence.length ? evidence.join("; ") : "Outdoor data available without AQI or PM2.5"}. ${extra}`;
 };
 
-function routineRecs(c: RuleContext, p: HouseholdProfile): Recommendation[] {
+function outdoorActivity(c: RuleContext) {
+  switch (c.outdoorCondition) {
+    case "high":
+      return {
+        title: "Move outdoor exercise and play indoors",
+        action: "Move exercise or play indoors while outdoor indicators are high.",
+      };
+    case "lower":
+      return {
+        title: "Check conditions before outdoor activity",
+        action:
+          "Consider outdoor exercise or play if local conditions allow. Recheck the reading before going out later.",
+      };
+    case "unknown":
+      return {
+        title: "Check an outdoor reading before planning exercise or play",
+        action: "Choose indoor exercise or play until a current reading can inform the decision.",
+      };
+  }
+}
+
+function routineRecs(
+  c: RuleContext,
+  p: HouseholdProfile,
+  activity: ReturnType<typeof outdoorActivity>,
+): Recommendation[] {
   const out: Recommendation[] = [];
   const motor = p.commuteMode === "private_car" || p.commuteMode === "two_wheeler";
   out.push({
@@ -111,12 +154,8 @@ function routineRecs(c: RuleContext, p: HouseholdProfile): Recommendation[] {
     out.push({
       id: "routine-exercise",
       pillar: "routines",
-      title: c.high
-        ? "Move outdoor exercise and play indoors today"
-        : "Time outdoor activity for the cleaner window",
-      what: c.high
-        ? "Replace outdoor runs or children's outdoor play with indoor activity until levels drop."
-        : "Prefer late morning to mid-afternoon for outdoor exercise or play, away from busy roads.",
+      title: activity.title,
+      what: activity.action,
       why: describeOutdoorEvidence(
         c,
         `Routine: ${p.exerciseRoutine.replace(/_/g, " ")}${p.youngChildren ? "; young children present" : ""}.`,
@@ -225,37 +264,46 @@ function sustainableRecs(c: RuleContext, p: HouseholdProfile): Recommendation[] 
   ];
 }
 
-function planner(c: RuleContext, p: HouseholdProfile): Planner {
+function planner(
+  c: RuleContext,
+  p: HouseholdProfile,
+  activity: ReturnType<typeof outdoorActivity>,
+): Planner {
+  const activityReason = describeOutdoorEvidence(
+    c,
+    "Recheck outdoor conditions before a later outing.",
+  );
   return {
     morning:
-      c.high || !c.usable
-        ? {
-            action:
-              p.exerciseRoutine === "morning_outdoor"
-                ? "Do your workout indoors; keep windows closed"
-                : "Keep windows closed; run kitchen exhaust while cooking",
-            reason: "Winter mornings often trap pollutants near the ground.",
-            pillar: p.exerciseRoutine === "morning_outdoor" ? "routines" : "indoor",
-          }
+      p.exerciseRoutine === "morning_outdoor"
+        ? { action: activity.action, reason: activityReason, pillar: "routines" }
         : {
-            action: "Short cross-ventilation after breakfast cooking",
-            reason: "Outdoor levels are lower right now.",
+            action: ventilation(c),
+            reason: describeOutdoorEvidence(c, "Use current evidence for ventilation decisions."),
             pillar: "indoor",
           },
-    afternoon: {
-      action:
-        p.commuteMode === "private_car"
-          ? "Batch errands into one trip, or use metro/bus"
-          : "Run errands and outdoor play in this window",
-      reason: "Midday mixing usually disperses smog more than mornings/evenings.",
-      pillar: p.commuteMode === "private_car" ? "sustainable" : "routines",
-    },
+    afternoon:
+      p.commuteMode === "private_car"
+        ? {
+            action: "Batch errands into one trip, or use metro/bus",
+            reason: "Combining trips reduces unnecessary driving.",
+            pillar: "sustainable",
+          }
+        : p.youngChildren ||
+            p.exerciseRoutine === "morning_outdoor" ||
+            p.exerciseRoutine === "evening_outdoor"
+          ? { action: activity.action, reason: activityReason, pillar: "routines" }
+          : {
+              action: "Group essential errands if you need to go out.",
+              reason: activityReason,
+              pillar: "routines",
+            },
     evening: {
       action: p.hasAirPurifier
         ? "Close the bedroom and run the purifier before sleep"
         : "Damp-dust the bedroom and keep it closed overnight",
       reason:
-        "Evening traffic and cooling air raise outdoor particles; sleep is the longest indoor exposure.",
+        "Prepare the bedroom before sleep, when the household will spend several hours there.",
       pillar: "indoor",
     },
   };
@@ -269,6 +317,7 @@ export function runRuleEngine(
   modeReason = "Rule-based guidance",
 ): Advisory {
   const c = buildContext(air, p, now);
+  const activity = outdoorActivity(c);
   return {
     mode: "rule_based",
     modeReason,
@@ -277,8 +326,12 @@ export function runRuleEngine(
     ventilation: ventilation(c),
     purifierApplicable: p.hasAirPurifier,
     liveDataAvailable: c.usable,
-    recommendations: [...routineRecs(c, p), ...indoorRecs(c, p), ...sustainableRecs(c, p)],
-    planner: planner(c, p),
+    recommendations: [
+      ...routineRecs(c, p, activity),
+      ...indoorRecs(c, p),
+      ...sustainableRecs(c, p),
+    ],
+    planner: planner(c, p, activity),
     rejectedAiItems: 0,
   };
 }

@@ -3,6 +3,7 @@ import type {
   NormalizedAirQuality,
   ResolvedLocation,
 } from "@/types/airQuality";
+import { hasEnvironmentalValue } from "@/domain/outdoorEvidence";
 import { computeFreshness } from "@/domain/freshness";
 import { fetchCpcb } from "./cpcbProvider";
 import { fetchOpenMeteo } from "./openMeteoProvider";
@@ -19,9 +20,6 @@ export interface ProviderDeps {
   openMeteo?: typeof fetchOpenMeteo;
   now?: () => Date;
 }
-
-const eligible = (n: NormalizedAirQuality | null, now: Date): n is NormalizedAirQuality =>
-  !!n && computeFreshness(n.measuredAt, n.measurementType, now) !== "stale";
 
 /**
  * Ground station (CPCB, then WAQI, when configured and fresh) → Open-Meteo CAMS model.
@@ -46,11 +44,14 @@ export async function resolveAirQuality(
         timer = setTimeout(() => reject(new UpstreamError("deadline")), remaining);
       });
       const r = await Promise.race([fn(), timeout]);
-      if (eligible(r, now())) {
+      if (!r) attempted.push(`${name}: no eligible station`);
+      else if (computeFreshness(r.measuredAt, r.measurementType, now()) === "stale")
+        attempted.push(`${name}: stale`);
+      else if (!hasEnvironmentalValue(r)) attempted.push(`${name}: no usable environmental values`);
+      else {
         attempted.push(`${name}: used`);
         return r;
       }
-      attempted.push(r ? `${name}: stale` : `${name}: no eligible station`);
     } catch (e) {
       attempted.push(
         `${name}: ${e instanceof UpstreamError && e.reason === "deadline" ? "deadline exceeded" : "failed"}`,
