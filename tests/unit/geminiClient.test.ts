@@ -75,3 +75,44 @@ describe("Gemini model configuration", () => {
     expect(GEMINI_MODEL).toBe(configuredModel);
   });
 });
+
+describe("Gemini stage deadline", () => {
+  afterEach(() => vi.useRealTimers());
+  it.each(["headers", "body", "fallback"])(
+    "stops waiting for %s at the shared deadline",
+    async (phase) => {
+      const { callGemini } = await import("@/server/gemini/geminiClient");
+      vi.useFakeTimers();
+      vi.stubEnv("GEMINI_MODEL", configuredModel);
+      const pending = new Promise<never>(() => {});
+      const fetchMock = vi.fn<typeof fetch>(async () => {
+        if (phase === "fallback" && fetchMock.mock.calls.length <= 3) {
+          await new Promise((resolve) => setTimeout(resolve, 4000));
+          return new Response(null, { status: 503 });
+        }
+        if (phase === "body") {
+          const response = Response.json({});
+          vi.spyOn(response, "json").mockReturnValue(pending);
+          return response;
+        }
+        return pending;
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const result = callGemini("dummy", "system", "user").catch((error: unknown) => error);
+      const expiry = Symbol("still pending");
+      await vi.advanceTimersByTimeAsync(20000);
+      expect(await Promise.race([result, Promise.resolve(expiry)])).toMatchObject({
+        reason: "deadline",
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(phase === "fallback" ? 4 : 2);
+      if (phase === "fallback") expect(fetchMock.mock.calls[3]?.[0]).toBe(modelUrl(defaultModel));
+    },
+  );
+  it("propagates 429 immediately without another model or retry", async () => {
+    const { callGemini } = await import("@/server/gemini/geminiClient");
+    const fetchMock = vi.fn(async () => new Response(null, { status: 429 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(callGemini("dummy", "system", "user")).rejects.toMatchObject({ status: 429 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
