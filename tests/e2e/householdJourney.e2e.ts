@@ -32,14 +32,16 @@ const rec = (id: string, pillar: string) => ({
 });
 
 async function mockApis(page: Page) {
-  await page.route("**/api/public/geocode*", (r) =>
-    r.fulfill({
-      json: {
-        results: [
-          { name: "Lucknow", admin: "Uttar Pradesh", coordinates: { lat: 26.84, lon: 80.92 } },
-        ],
-      },
-    }),
+  await page.route(
+    (url) => url.pathname === "/api/public/geocode",
+    (r) =>
+      r.fulfill({
+        json: {
+          results: [
+            { name: "Lucknow", admin: "Uttar Pradesh", coordinates: { lat: 26.84, lon: 80.92 } },
+          ],
+        },
+      }),
   );
   await page.route("**/api/public/advisory", async (r) => {
     const body = r.request().postDataJSON() as { location: { name: string } };
