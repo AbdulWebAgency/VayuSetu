@@ -153,12 +153,14 @@ export const PlannerSchema = z.object({
 });
 export type Planner = z.infer<typeof PlannerSchema>;
 
-/** Strict schema every Gemini response must satisfy before the output guard runs. */
-export const AiAdvisoryResponseSchema = z.object({
-  recommendations: z.array(RecommendationSchema).min(3).max(12),
-  planner: PlannerSchema,
-});
-export type AiAdvisoryResponse = z.infer<typeof AiAdvisoryResponseSchema>;
+/** Private model contract. All rendered content is supplied by the application. */
+export const GeminiChoicesSchema = z
+  .object({
+    priorityId: z.enum(["sustain-transport", "sustain-energy"]).nullable(),
+    explanationId: z.enum(["child-play", "car-trips", "home-source-control"]).nullable(),
+  })
+  .strict();
+export type GeminiChoices = z.infer<typeof GeminiChoicesSchema>;
 
 export const AdvisorySchema = z.object({
   mode: z.enum(["rule_based", "ai_enriched"]),

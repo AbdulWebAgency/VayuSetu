@@ -1,19 +1,8 @@
 import { guardAiAdvisory, rejectReason, unsupportedEnvironmentalClaim } from "@/domain/outputGuard";
 import { runRuleEngine } from "@/domain/ruleEngine";
-import type { AiAdvisoryResponse } from "@/types/airQuality";
+import { GeminiChoicesSchema } from "@/types/airQuality";
+import { eligibleChoices } from "@/domain/advisoryPersonalization";
 import { air, NOW, profile } from "../fixtures/payloads";
-
-const item = (id: string, pillar: "routines" | "indoor" | "sustainable", what: string) => ({
-  id,
-  pillar,
-  title: "Title here",
-  what,
-  why: "Because of conditions",
-  how: "Reduces exposure",
-  limitation: "Costs effort",
-  basis: "Estimated" as const,
-});
-const slot = { action: "Stay indoors", reason: "High levels", pillar: "routines" as const };
 
 describe("output guard", () => {
   const p = profile({ hasAirPurifier: false });
@@ -25,63 +14,77 @@ describe("output guard", () => {
     expect(rejectReason("This prevents asthma", p)).toBe("medical claim");
     expect(rejectReason("Close windows during peaks", p)).toBeNull();
   });
-  it("fills missing pillars from the baseline and counts rejections", () => {
-    const ai: AiAdvisoryResponse = {
-      recommendations: [
-        item("a", "routines", "Carpool on Monday"),
-        item("b", "indoor", "Run your purifier"),
-        item("c", "routines", "Take the metro"),
-      ],
-      planner: {
-        morning: slot,
-        afternoon: slot,
-        evening: { ...slot, action: "Turn on the purifier" },
-      },
-    };
-    const g = guardAiAdvisory(ai, p, base);
-    expect(g.mode).toBe("ai_enriched");
-    expect(g.rejectedAiItems).toBe(2);
-    expect(new Set(g.recommendations.map((r) => r.pillar))).toEqual(
-      new Set(["routines", "indoor", "sustainable"]),
+  const choices = eligibleChoices(base, p);
+  it.each([
+    [null, null, "rule_based", 0],
+    ["sustain-transport", null, "rule_based", 0],
+    [null, "car-trips", "rule_based", 1],
+    ["sustain-energy", "car-trips", "ai_enriched", 1],
+  ] as const)(
+    "reflects only visible choices %s / %s",
+    (priorityId, explanationId, mode, rejected) => {
+      const result = guardAiAdvisory({ priorityId, explanationId }, p, base, choices, air());
+      expect(result.mode).toBe(mode);
+      expect(result.rejectedAiItems).toBe(rejected);
+      expect(result.planner).toEqual(base.planner);
+      expect(result.ventilation).toBe(base.ventilation);
+      expect(result.modeReason).not.toContain("selected the explanation");
+      if (mode === "rule_based") expect(result.recommendations).toEqual(base.recommendations);
+      else {
+        expect(result.modeReason).toContain("prioritized household energy");
+        expect(result.recommendations).toEqual([
+          ...base.recommendations.slice(0, -2),
+          ...base.recommendations.slice(-2).reverse(),
+        ]);
+      }
+    },
+  );
+  it("requires the target card and both sustainable cards for eligibility", () => {
+    const missing = { ...base, recommendations: [] };
+    expect(eligibleChoices(missing, profile({ youngChildren: true }))).toEqual({
+      priorities: [],
+      explanations: [],
+    });
+    const result = guardAiAdvisory(
+      { priorityId: "sustain-energy", explanationId: "child-play" },
+      p,
+      missing,
+      eligibleChoices(missing, p),
+      air(),
     );
-    expect(g.planner.evening).toEqual(base.planner.evening);
+    expect(result).toMatchObject({ mode: "rule_based", rejectedAiItems: 2, recommendations: [] });
   });
-  const guidance = (
-    what: string,
-    basis: "Measured" | "Estimated" | "Qualitative" = "Measured",
-  ): AiAdvisoryResponse => ({
-    recommendations: [{ ...item("verified", "routines", what), basis }],
-    planner: { morning: slot, afternoon: slot, evening: slot },
-  });
-  it("overwrites Gemini basis to Estimated for fresh Open-Meteo", () => {
-    const g = guardAiAdvisory(guidance("Outdoor PM2.5 is 180 µg/m³"), p, base, air(), NOW);
-    expect(g.recommendations.find((r) => r.id === "verified")?.basis).toBe("Estimated");
-  });
-  it.each(["CPCB", "WAQI"] as const)(
-    "overwrites Gemini basis to Measured for %s ground observations",
+  it.each(["CPCB", "WAQI", "OPEN_METEO"] as const)(
+    "preserves every baseline evidence label for %s",
     (provider) => {
-      const source = air({ provider, measurementType: "ground_station" });
-      const g = guardAiAdvisory(
-        guidance("Choose quieter roads", "Estimated"),
+      const source = air({
+        provider,
+        measurementType: provider === "OPEN_METEO" ? "model_estimate" : "ground_station",
+      });
+      const baseline = runRuleEngine(source, p, NOW);
+      const result = guardAiAdvisory(
+        { priorityId: "sustain-energy", explanationId: null },
         p,
-        runRuleEngine(source, p, NOW),
+        baseline,
+        eligibleChoices(baseline, p),
         source,
-        NOW,
       );
-      expect(g.recommendations.find((r) => r.id === "verified")?.basis).toBe("Measured");
+      for (const card of baseline.recommendations)
+        expect(result.recommendations.find((r) => r.id === card.id)).toEqual(card);
     },
   );
   it.each([null, air({ measuredAt: "2026-11-22T08:59:00.000Z" })])(
-    "uses Qualitative when source is absent or stale",
+    "preserves qualitative provenance for absent or stale evidence",
     (source) => {
-      const g = guardAiAdvisory(
-        guidance("Choose quieter roads"),
+      const baseline = runRuleEngine(source, p, NOW);
+      const result = guardAiAdvisory(
+        { priorityId: "sustain-energy", explanationId: null },
         p,
-        runRuleEngine(source, p, NOW),
+        baseline,
+        eligibleChoices(baseline, p),
         source,
-        NOW,
       );
-      expect(g.recommendations.find((r) => r.id === "verified")?.basis).toBe("Qualitative");
+      expect(result.recommendations.every((card) => card.basis === "Qualitative")).toBe(true);
       expect(unsupportedEnvironmentalClaim("AQI is 230", p, null)).toBe(true);
     },
   );
@@ -94,9 +97,7 @@ describe("output guard", () => {
     "O3 is 30",
     "CO is 900",
   ])("rejects unsupported environmental claims: %s", (text) => {
-    const g = guardAiAdvisory(guidance(text), p, base, air(), NOW);
-    expect(g.recommendations.some((r) => r.id === "verified")).toBe(false);
-    expect(g.rejectedAiItems).toBe(1);
+    expect(unsupportedEnvironmentalClaim(text, p, air())).toBe(true);
   });
   it("accepts only verified values for each pollutant, including full names and user-reported indoor PM2.5", () => {
     const source = air({ pollutants: { pm25: 180, pm10: 260, no2: 40, so2: 12, o3: 30, co: 900 } });
@@ -117,20 +118,18 @@ describe("output guard", () => {
     expect(unsupportedEnvironmentalClaim("Indoor PM2.5 is 180 µg/m³", indoor, source)).toBe(true);
     expect(unsupportedEnvironmentalClaim("Indoor PM2.5 is 65 µg/m³", p, source)).toBe(true);
   });
-  it("applies numerical integrity to planner slots too", () => {
-    const ai = guidance("Choose quieter roads");
-    ai.planner.morning = { ...slot, reason: "AQI is 5" };
-    const g = guardAiAdvisory(ai, p, base, air(), NOW);
-    expect(g.planner.morning).toEqual(base.planner.morning);
-    expect(g.rejectedAiItems).toBe(1);
-  });
-  it("rejects numerical claims spread across recommendation fields", () => {
-    const ai = guidance("It is 65 µg/m³");
-    const first = ai.recommendations[0];
-    if (!first) throw new Error("Missing recommendation");
-    first.title = "Outdoor PM2.5";
-    const g = guardAiAdvisory(ai, p, base, air(), NOW);
-    expect(g.recommendations.some((r) => r.id === "verified")).toBe(false);
+  it.each([
+    { planner: { morning: { reason: "AQI is 5" } } },
+    { recommendations: [{ title: "Outdoor PM2.5", what: "It is 65 µg/m³" }] },
+    { priorityId: "invented" },
+    { explanationId: "invented" },
+  ])("rejects unauthorized model content %#", (extra) => {
+    const raw = { priorityId: null, explanationId: null, ...extra };
+    expect(GeminiChoicesSchema.safeParse(raw).success).toBe(false);
+    const result = guardAiAdvisory(raw, p, base, choices, air());
+    expect(result.recommendations).toEqual(base.recommendations);
+    expect(result.planner).toEqual(base.planner);
+    expect(result.mode).toBe("rule_based");
   });
   it.each([
     "Air quality index is 5",
@@ -160,7 +159,7 @@ describe("output guard", () => {
   });
 });
 
-it("characterizes the open Gemini planner consistency gap under high outdoor pollution", () => {
+it("blocks a contradictory Gemini afternoon action under high outdoor pollution", () => {
   const household = profile({ youngChildren: true });
   const baseline = runRuleEngine(air(), household, NOW);
   const afternoon = {
@@ -172,8 +171,8 @@ it("characterizes the open Gemini planner consistency gap under high outdoor pol
     { recommendations: baseline.recommendations, planner: { ...baseline.planner, afternoon } },
     household,
     baseline,
+    eligibleChoices(baseline, household),
     air(),
-    NOW,
   );
-  expect(result.planner.afternoon).toEqual(afternoon);
+  expect(result.planner.afternoon).toEqual(baseline.planner.afternoon);
 });

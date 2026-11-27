@@ -1,4 +1,4 @@
-import { AiAdvisoryResponseSchema, type AiAdvisoryResponse } from "@/types/airQuality";
+import { GeminiChoicesSchema, type GeminiChoices } from "@/types/airQuality";
 import { fetchJson, UpstreamError } from "../providers/http";
 
 const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite";
@@ -15,7 +15,7 @@ async function invokeModel(
   system: string,
   user: string,
   deadlineAt: number,
-): Promise<AiAdvisoryResponse> {
+): Promise<GeminiChoices> {
   const raw = await fetchJson(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
@@ -53,7 +53,7 @@ async function invokeModel(
   } catch {
     throw new UpstreamError("non-json");
   }
-  const parsed = AiAdvisoryResponseSchema.safeParse(obj);
+  const parsed = GeminiChoicesSchema.safeParse(obj);
   if (!parsed.success) throw new UpstreamError("schema");
   return parsed.data;
 }
@@ -66,7 +66,7 @@ export async function callGemini(
   apiKey: string,
   system: string,
   user: string,
-): Promise<AiAdvisoryResponse> {
+): Promise<GeminiChoices> {
   const configuredModel = process.env["GEMINI_MODEL"];
   const primary =
     configuredModel === undefined ? GEMINI_MODEL : configuredModel.trim() || DEFAULT_GEMINI_MODEL;

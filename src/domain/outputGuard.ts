@@ -1,12 +1,10 @@
-import type {
-  Advisory,
-  AiAdvisoryResponse,
-  HouseholdProfile,
-  NormalizedAirQuality,
-  Recommendation,
+import {
+  GeminiChoicesSchema,
+  type Advisory,
+  type HouseholdProfile,
+  type NormalizedAirQuality,
 } from "@/types/airQuality";
-import { PillarSchema } from "@/types/airQuality";
-import { computeFreshness } from "./freshness";
+import type { EligibleChoices } from "./advisoryPersonalization";
 
 const PURIFIER_ASSUMED = /\b(purifiers?|hepa|air\s+cleaner|filtration\s+(unit|device))\b/i;
 const INDOOR_AQI =
@@ -88,63 +86,64 @@ export function unsupportedEnvironmentalClaim(
   return false;
 }
 
-/**
- * Filters AI output against household constraints and fills any missing pillar or
- * planner slot from the deterministic baseline.
- */
+/** Only server-owned cards and reviewed explanations can enter the public advisory. */
 export function guardAiAdvisory(
-  ai: AiAdvisoryResponse,
+  raw: unknown,
   profile: HouseholdProfile,
   baseline: Advisory,
-  source: NormalizedAirQuality | null = null,
-  now = new Date(),
+  options: EligibleChoices,
+  air: NormalizedAirQuality | null,
 ): Advisory {
-  const air =
-    source && computeFreshness(source.measuredAt, source.measurementType, now) !== "stale"
-      ? source
-      : null;
-  const basis: Recommendation["basis"] = !air
-    ? "Qualitative"
-    : air.measurementType === "ground_station" &&
-        (air.provider === "CPCB" || air.provider === "WAQI")
-      ? "Measured"
-      : air.provider === "OPEN_METEO" && air.measurementType === "model_estimate"
-        ? "Estimated"
-        : "Qualitative";
-  const unsafe = (text: string) =>
-    rejectReason(text, profile) || unsupportedEnvironmentalClaim(text, profile, air);
+  const parsed = GeminiChoicesSchema.safeParse(raw);
+  if (!parsed.success)
+    return { ...baseline, modeReason: "AI output failed validation — rule-based guidance" };
+  const { priorityId, explanationId } = parsed.data;
+  const recommendations = [...baseline.recommendations];
+  const contributions: string[] = [];
   let rejected = 0;
-  const accepted: Recommendation[] = [];
-  for (const r of ai.recommendations) {
-    const text = [r.title, r.what, r.why, r.how, r.limitation].join(" ");
-    if (unsafe(text) || [r.title, r.what, r.why, r.how, r.limitation].some(unsafe)) rejected++;
-    else accepted.push({ ...r, basis });
-  }
-  for (const pillar of PillarSchema.options) {
-    if (!accepted.some((r) => r.pillar === pillar))
-      accepted.push(...baseline.recommendations.filter((r) => r.pillar === pillar));
-  }
-  const guardPlannerSlot = (k: keyof Advisory["planner"]) => {
-    const candidateSlot = ai.planner[k];
-    if (
-      unsafe(`${candidateSlot.action} ${candidateSlot.reason}`) ||
-      [candidateSlot.action, candidateSlot.reason].some(unsafe)
-    ) {
-      rejected++;
-      return baseline.planner[k];
+  if (priorityId !== null) {
+    if (!options.priorities.includes(priorityId)) rejected++;
+    else {
+      const firstIndex = recommendations.findIndex((card) =>
+        options.priorities.some((id) => id === card.id),
+      );
+      const selectedIndex = recommendations.findIndex((card) => card.id === priorityId);
+      const first = recommendations[firstIndex];
+      const selected = recommendations[selectedIndex];
+      if (first && selected && firstIndex !== selectedIndex) {
+        recommendations[firstIndex] = selected;
+        recommendations[selectedIndex] = first;
+        contributions.push(
+          priorityId === "sustain-energy"
+            ? "prioritized household energy"
+            : "prioritized lower-emission trips",
+        );
+      }
     }
-    return candidateSlot;
-  };
+  }
+  if (explanationId !== null) {
+    const variant = options.explanations.find((option) => option.id === explanationId);
+    const index = recommendations.findIndex((card) => card.id === variant?.cardId);
+    const card = recommendations[index];
+    if (
+      !variant ||
+      !card ||
+      rejectReason(variant.text, profile) ||
+      unsupportedEnvironmentalClaim(variant.text, profile, air)
+    )
+      rejected++;
+    else if (!card.how.includes(variant.text)) {
+      recommendations[index] = { ...card, how: `${card.how} ${variant.text}` };
+      contributions.push(`selected the explanation about ${variant.label}`);
+    }
+  }
   return {
     ...baseline,
-    mode: "ai_enriched",
-    modeReason: "AI-enriched guidance, checked by safety rules",
-    recommendations: accepted,
-    planner: {
-      morning: guardPlannerSlot("morning"),
-      afternoon: guardPlannerSlot("afternoon"),
-      evening: guardPlannerSlot("evening"),
-    },
+    recommendations,
     rejectedAiItems: rejected,
+    mode: contributions.length ? "ai_enriched" : "rule_based",
+    modeReason: contributions.length
+      ? `AI ${contributions.join(" and ")}.`
+      : "Rule-based guidance; AI choices did not change the displayed advice.",
   };
 }

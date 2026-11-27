@@ -3,46 +3,11 @@ import { normalizeOpenMeteo, normalizeGeocode } from "@/domain/normalizer";
 import { fetchJson, UpstreamError } from "@/server/providers/http";
 import { PROVIDER_DEADLINE_MS, resolveAirQuality } from "@/server/providers/providerHierarchy";
 import { cacheClear } from "@/server/cache/fetchCache";
-import type { AiAdvisoryResponse } from "@/types/airQuality";
+import type { GeminiChoices } from "@/types/airQuality";
 import { DELHI, geocodeRaw, NOW, openMeteoRaw, profile } from "../fixtures/payloads";
 
 const om = async () => normalizeOpenMeteo(openMeteoRaw, NOW);
-const slot = { action: "Commute by metro", reason: "Lower exposure", pillar: "routines" as const };
-const ai: AiAdvisoryResponse = {
-  recommendations: [
-    {
-      id: "r",
-      pillar: "routines",
-      title: "Metro commute",
-      what: "Take the metro",
-      why: "High PM2.5",
-      how: "Less exposure",
-      limitation: "Crowding",
-      basis: "Estimated",
-    },
-    {
-      id: "i",
-      pillar: "indoor",
-      title: "Run purifier",
-      what: "Run your purifier",
-      why: "High PM2.5",
-      how: "Filters air",
-      limitation: "Cost",
-      basis: "Estimated",
-    },
-    {
-      id: "s",
-      pillar: "sustainable",
-      title: "Carpool",
-      what: "Share rides",
-      why: "Fewer trips",
-      how: "Less emissions",
-      limitation: "Coordination",
-      basis: "Qualitative",
-    },
-  ],
-  planner: { morning: slot, afternoon: slot, evening: slot },
-};
+const ai: GeminiChoices = { priorityId: "sustain-energy", explanationId: "child-play" };
 
 describe("advisory pipeline", () => {
   const loc = normalizeGeocode(geocodeRaw)[0];
@@ -176,22 +141,19 @@ describe("advisory pipeline", () => {
     });
     expect(r.status).toBe("ok");
   });
-  it("rejects invented Gemini readings and overwrites accepted model basis in the complete pipeline", async () => {
-    const generated: AiAdvisoryResponse = {
+  it("discards legacy model-authored readings, labels and planner instructions", async () => {
+    const generated = {
       ...ai,
-      recommendations: ai.recommendations.map((r) => ({
-        ...r,
-        basis: "Measured",
-        what: r.id === "r" ? "Outdoor AQI is 5" : r.what,
-      })),
+      recommendations: [{ id: "r", what: "Outdoor AQI is 5", basis: "Measured" }],
+      planner: { afternoon: { action: "Play outdoors this afternoon." } },
     };
     const r = await buildAdvisory(
       { location: DELHI, profile: profile() },
       { openMeteo: om, geminiKey: "test", gemini: async () => generated, now: () => NOW },
     );
-    expect(r.advisory.rejectedAiItems).toBe(2);
-    expect(r.advisory.recommendations.some((r) => r.id === "r")).toBe(false);
-    expect(r.advisory.recommendations.find((r) => r.id === "s")?.basis).toBe("Estimated");
+    expect(r.advisory.mode).toBe("rule_based");
+    expect(r.advisory.recommendations[0]?.basis).toBe("Estimated");
+    expect(JSON.stringify(r.advisory)).not.toMatch(/Outdoor AQI is 5|Play outdoors this afternoon/);
   });
   it("shares remaining time across CPCB and WAQI instead of restarting the budget", async () => {
     vi.useFakeTimers();

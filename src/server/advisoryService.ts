@@ -1,3 +1,4 @@
+import { eligibleChoices } from "@/domain/advisoryPersonalization";
 import type { AdvisoryRequest, Advisory, AirQualityResponse } from "@/types/airQuality";
 import { runRuleEngine } from "@/domain/ruleEngine";
 import { guardAiAdvisory } from "@/domain/outputGuard";
@@ -38,13 +39,16 @@ export async function buildAdvisory(
       ),
     };
   const baseline = runRuleEngine(data, req.profile, now);
+  const options = eligibleChoices(baseline, req.profile);
+  if (!options.priorities.length && !options.explanations.length)
+    return { air, advisory: baseline };
   try {
     const ai = await (deps.gemini ?? callGemini)(
       deps.geminiKey,
       SYSTEM_INSTRUCTION,
-      buildUserPrompt(req.profile, data, baseline, req.location.name),
+      buildUserPrompt(req.profile, data, baseline, req.location.name, options),
     );
-    return { air, advisory: guardAiAdvisory(ai, req.profile, baseline, data, now) };
+    return { air, advisory: guardAiAdvisory(ai, req.profile, baseline, options, data) };
   } catch (e) {
     const reason = describeAiFailure(e);
     return { air, advisory: { ...baseline, modeReason: `${reason} — rule-based guidance` } };

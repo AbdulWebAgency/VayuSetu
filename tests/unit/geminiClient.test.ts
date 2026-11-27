@@ -1,21 +1,8 @@
-import type { AiAdvisoryResponse } from "@/types/airQuality";
+import type { GeminiChoices } from "@/types/airQuality";
 
 const defaultModel = "gemini-3.5-flash-lite";
 const configuredModel = "gemini-2.5-flash";
-const slot = { action: "Stay indoors", reason: "Limit exposure", pillar: "routines" } as const;
-const advisory: AiAdvisoryResponse = {
-  recommendations: (["routines", "indoor", "sustainable"] as const).map((pillar) => ({
-    id: pillar,
-    pillar,
-    title: "Limit exposure",
-    what: "Stay indoors",
-    why: "Reduce exposure",
-    how: "Move activities inside",
-    limitation: "Indoor conditions vary",
-    basis: "Qualitative",
-  })),
-  planner: { morning: slot, afternoon: slot, evening: slot },
-};
+const advisory: GeminiChoices = { priorityId: "sustain-energy", explanationId: null };
 
 function mockGeminiFetch() {
   const fetchMock = vi.fn<typeof fetch>(async () =>
@@ -115,4 +102,19 @@ describe("Gemini stage deadline", () => {
     await expect(callGemini("dummy", "system", "user")).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+});
+
+it("rejects an unexpected model-authored field at the client boundary", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({
+        candidates: [
+          { content: { parts: [{ text: JSON.stringify({ ...advisory, how: "AQI is 5" }) }] } },
+        ],
+      }),
+    ),
+  );
+  const { callGemini } = await import("@/server/gemini/geminiClient");
+  await expect(callGemini("fixture", "system", "user")).rejects.toMatchObject({ reason: "schema" });
 });
