@@ -1,4 +1,4 @@
-﻿# 🌿 VayuSetu — Urban Air Quality & Winter Smog Assistant
+# 🌿 VayuSetu — Urban Air Quality & Winter Smog Assistant
 
 <p align="center">
   <strong>Bridging the gap between environmental data and healthier everyday decisions.</strong>
@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/Challenge-PromptWars%20Virtual%20Challenge%2006-blue?style=for-the-badge" alt="PromptWars Challenge 06"/>
   <img src="https://img.shields.io/badge/Framework-TanStack%20Start-FF4154?style=for-the-badge" alt="TanStack Start"/>
   <img src="https://img.shields.io/badge/AI-Google%20Gemini-4285F4?style=for-the-badge&logo=googlegemini&logoColor=white" alt="Google Gemini"/>
-  <img src="https://img.shields.io/badge/Tests-126%20Passing-brightgreen?style=for-the-badge" alt="126 Passing Tests"/>
+  <img src="https://img.shields.io/badge/Tests-167%20Passing-brightgreen?style=for-the-badge" alt="167 Passing Tests"/>
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 
 **VayuSetu** is an AI-assisted urban air-quality companion designed to help Indian households make safer, more informed and sustainable everyday decisions during periods of air pollution and winter smog.
 
-It combines environmental data from air-quality providers with deterministic safety rules and optional Google Gemini enrichment to deliver practical recommendations based on location, household circumstances and available air-quality information.
+It combines environmental data from air-quality providers with deterministic safety rules and optional, evidence-constrained Google Gemini personalization to deliver practical recommendations based on location, household circumstances and available air-quality information.
 
 🌐 **Live application:** https://vayusetu-eight.vercel.app
 💻 **GitHub repository:** https://github.com/AbdulWebAgency/VayuSetu
@@ -61,10 +61,33 @@ Recommendations are designed to explain their reasoning rather than simply prese
 - **Household personalisation:** Considers household circumstances and the needs of different members.
 - **Daily planning:** Organises practical recommendations across morning, afternoon and evening.
 - **Indoor air-quality guidance:** Provides actionable suggestions without treating a single indoor PM2.5 reading as a complete indoor AQI measurement.
-- **AI-enriched recommendations:** Uses Google Gemini to improve the explanation and presentation of guidance when available.
+- **Evidence-constrained AI personalization:** Gemini selects from approved, household-specific personalization options without rewriting environmental facts or safety decisions.
 - **Deterministic fallback:** Continues to provide rule-based guidance when AI services are unavailable.
 - **Data provenance:** Displays relevant source, measurement timing and AQI scale information.
-- **Safety checks:** Validates AI-generated responses before they are presented to users.
+- **Safety checks:** Validates structured AI selections and rejects unsupported or ineligible personalization.
+
+---
+
+## 🛡️ Household Guidance Confidence
+
+Understanding whether guidance is supported by current evidence is as important as receiving the guidance itself.
+
+VayuSetu makes that distinction visible through four connected safeguards:
+
+| Safeguard                     | Household benefit                                                                                                                |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Outdoor evidence transparency | Explains whether current observations indicate elevated conditions, lower observed indicators or insufficient decision evidence. |
+| Indoor measurement integrity  | Prevents old or untimed indoor readings from being presented as recent measurements.                                             |
+| Profile synchronization       | Identifies recommendations generated for previous household inputs and provides an explicit update action.                       |
+| Truthful AI contribution      | Distinguishes accepted, visible AI personalization from deterministic guidance.                                                  |
+
+The outdoor evidence indicator uses the same classification logic as the deterministic rule engine, keeping recommendations and their explanations consistent.
+
+When household inputs change, previous guidance is clearly identified until the user requests an update. Obsolete in-flight responses cannot overwrite refreshed guidance.
+
+Indoor comparison feedback remains responsive to changes in the reported measurement.
+
+Confidence here means transparency about evidence and its limitations, not a numerical confidence score, pollution forecast or guarantee of safe air.
 
 ---
 
@@ -82,33 +105,44 @@ The application uses a provider hierarchy involving:
 
 Provider availability can vary. The application preserves the provenance of the selected data rather than combining readings from different providers into a fabricated measurement.
 
+Providers returning no usable environmental values are skipped in favour of the next eligible provider. Partial observations retain their original attribution, but may provide insufficient evidence for particular household decisions.
+
+The rule engine distinguishes elevated indicators, lower observed indicators and insufficient decision evidence. Elevated evidence takes precedence when indicators disagree. Lower observed indicators do not establish that outdoor air is safe.
+
+Activity recommendations and daily planner decisions share the same environmental decision logic.
+
 ### Freshness classification
 
 Freshness is calculated using the provider's `measuredAt` timestamp, not the time the application fetched the data.
 
 | Data type      |         Live |                     Aging |        Stale |
 | -------------- | -----------: | ------------------------: | -----------: |
-| Ground station |  ≤90 minutes |            91–180 minutes | >180 minutes |
+| Ground station |  ≤90 minutes |           >90–180 minutes | >180 minutes |
 | Model data     | ≤180 minutes | Not separately classified | >180 minutes |
 
-Invalid measurement timestamps are treated as stale.
+Invalid and future measurement timestamps are treated as stale. Future observations remain ineligible until their reported measurement time arrives.
 
 ### Indoor air-quality safeguards
 
 - Indoor PM2.5 values are user-reported.
 - A single PM2.5 reading is not converted into an indoor AQI value.
-- Indoor and outdoor readings are compared only when their measurement timestamps are sufficiently close (within 120 minutes).
+- Indoor and outdoor readings are compared only when eligible measurement timestamps are within an inclusive 120-minute window, calculated before display rounding.
+- A reported reading age is anchored to an absolute measurement timestamp. Missing timing information does not imply a fresh measurement.
+- Indoor observations are session-only and clear on reload, while durable household preferences such as sensor ownership persist.
+- Legacy saved indoor readings without reliable timing are discarded.
 - Qualitative indoor guidance remains available even when a meaningful numerical comparison cannot be made.
 
 ### AI is an enrichment layer, not the source of truth
 
 Gemini does not generate live AQI measurements or replace environmental data providers.
 
-Instead, it helps produce contextual explanations and recommendations using available information.
+Instead, Gemini selects from a bounded set of eligible personalization options constructed from the household profile and deterministic advisory.
 
-AI responses are validated using Zod schemas and additional output-guard checks. Unsupported environmental numerical claims and unsafe recommendations are subject to these safeguards.
+The model may prioritize an approved recommendation or select an approved explanatory addition. It cannot rewrite environmental measurements, safety decisions, recommendation membership or planner actions.
 
-If AI enrichment fails, the deterministic rule engine continues to provide guidance.
+A strict Zod schema and output guard reject unexpected fields and discard ineligible selections. AI-enriched status is reported only when an accepted selection produces a visible change.
+
+If personalization is unavailable, rejected or produces no visible change, the deterministic advisory remains available.
 
 ---
 
@@ -133,8 +167,9 @@ flowchart TD
     H --> I[Deterministic Rule Engine]
     I --> J[Advisory Service]
 
-    J --> K[Gemini Enrichment]
-    K --> L[Zod Validation and Output Guard]
+    J --> K[Eligible Personalization Options]
+    K --> O[Gemini Option Selection]
+    O --> L[Zod Validation and Output Guard]
     L --> M[Final Advisory]
 
     J --> N[Rule-Based Fallback]
@@ -184,7 +219,7 @@ Security and reliability are built into the server-side architecture.
 - **Rate limiting:** Fixed-window, per-key rate limiting is implemented as a best-effort, per-instance mechanism.
 - **AI response validation:** Gemini responses are checked against a Zod schema and output guardrails.
 - **Provider resilience:** Provider failures and unavailable AI services are handled through fallback paths.
-- **Timeout handling:** Gemini requests have per-attempt timeouts and retry handling for eligible failures.
+- **Timeout handling:** Gemini uses a shared 20-second execution deadline across requests, response-body reads, retries and fallback models, alongside existing per-attempt timeouts.
 
 **Rate-limiting limitation:** The current limiter stores its counters in memory. It is not a distributed rate limiter, so limits are not globally shared across serverless instances.
 
@@ -192,15 +227,18 @@ Security and reliability are built into the server-side architecture.
 
 ## 🤖 Gemini integration
 
-Gemini is used to enrich contextual recommendations while preserving deterministic environmental data and safety rules.
+Gemini provides bounded household personalization while the deterministic rule engine remains responsible for environmental interpretation, safety decisions and practical guidance.
 
 The integration includes:
 
 - Configurable model selection through `GEMINI_MODEL`.
 - A default model of `gemini-3.5-flash-lite` in the current client implementation.
 - Fallback model handling.
-- Per-attempt timeouts and retries for eligible failures.
-- Structured JSON response generation.
+- Per-attempt timeouts and retries within a shared 20-second execution deadline.
+- Structured JSON selection of approved personalization options.
+- Request-local eligibility checks for recommendation prioritization and explanatory additions.
+- Preservation of deterministic actions, evidence and planner decisions.
+- AI contribution reporting based on accepted, visible personalization.
 - Zod schema validation.
 - Output guardrails.
 - Deterministic rule-based fallback when AI enrichment is unavailable.
@@ -217,8 +255,8 @@ The project includes automated tests covering the application’s domain logic, 
 
 | Test category    |     Result |
 | ---------------- | ---------: |
-| Test files       |  17 passed |
-| Individual tests | 126 passed |
+| Test files       |  18 passed |
+| Individual tests | 167 passed |
 | Failed tests     |          0 |
 
 **Command executed:**
@@ -227,7 +265,13 @@ The project includes automated tests covering the application’s domain logic, 
 npm test
 ```
 
-**Result:** All 17 test files and all 126 tests passed.
+**Result:** All 18 test files and all 167 tests passed.
+
+The regression suite covers environmental evidence sufficiency, provider fallback, activity consistency, Gemini deadlines, constrained personalization, measurement lifetime, exact indoor comparison boundaries and obsolete advisory responses.
+
+Both existing Playwright household journeys also passed against the development server after correcting API interception to avoid matching development JavaScript modules. The same journeys passed against a local production artifact before that test-harness correction.
+
+These browser journeys use mocked API responses and do not establish live-provider availability.
 
 Additional local verification:
 
@@ -260,6 +304,7 @@ The root `vercel.json` declares region `bom1` (Mumbai). The `npm run build` post
 
 - Node.js 24.x recommended
 - npm
+- Bun for the default Playwright development-server workflow and live smoke tests
 - A Google Gemini API key (optional)
 - Optional provider API keys for additional environmental data sources
 
@@ -328,7 +373,15 @@ npm run test:smoke
 
 Local development uses `npm run dev`. The live smoke-test script requires Bun. By default, Playwright uses `bun run dev` to manage its development server and requires a compatible browser. Set `E2E_BASE_URL` to point Playwright at an already running server instead.
 
-The Playwright development-server hydration failure remains unresolved and E2E verification is deferred to Phase 8. Mocked Vitest runs exercise the local advisory pipeline with test responses.
+The development-server Playwright interception issue has been resolved. Both household journeys pass using the default development-server configuration.
+
+To install the Playwright Chromium browser when needed:
+
+```bash
+npx playwright install chromium
+```
+
+Mocked Vitest and Playwright runs exercise the application with controlled test responses. Live smoke testing is a separate verification step.
 
 ---
 
@@ -340,7 +393,10 @@ VayuSetu is an informational and decision-support application, not a medical dia
 - Ground-station coverage and measurement frequency vary by location.
 - Model-based estimates are not equivalent to direct ground-station measurements.
 - Indoor measurements are user-reported and may not represent an entire home.
-- AI-generated explanations are constrained by validation and safety rules, but should not replace official public-health guidance.
+- Indoor observations clear on reload and must be entered again when needed.
+- Provider clock discrepancies can temporarily make future-dated observations ineligible.
+- Current observations do not establish future pollution conditions or guarantee safe outdoor activity.
+- Gemini personalization is optional and limited to approved choices. Guidance should not replace official public-health advice.
 - Rate limiting is per serverless instance rather than globally distributed.
 
 Users should follow official health advisories during severe pollution events.
