@@ -235,7 +235,7 @@ function indoorRecs(c: RuleContext, p: HouseholdProfile): Recommendation[] {
   return out;
 }
 
-function sustainableRecs(c: RuleContext, p: HouseholdProfile): Recommendation[] {
+function sustainableRecs(p: HouseholdProfile): Recommendation[] {
   return [
     {
       id: "sustain-transport",
@@ -326,11 +326,7 @@ export function runRuleEngine(
     ventilation: ventilation(c),
     purifierApplicable: p.hasAirPurifier,
     liveDataAvailable: c.usable,
-    recommendations: [
-      ...routineRecs(c, p, activity),
-      ...indoorRecs(c, p),
-      ...sustainableRecs(c, p),
-    ],
+    recommendations: [...routineRecs(c, p, activity), ...indoorRecs(c, p), ...sustainableRecs(p)],
     planner: planner(c, p, activity),
     rejectedAiItems: 0,
   };

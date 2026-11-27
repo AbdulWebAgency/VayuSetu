@@ -1,4 +1,3 @@
-import { Bus, Home, Leaf } from "lucide-react";
 import type { Advisory, Pillar } from "@/types/airQuality";
 
 import { PILLARS } from "./pillarMetadata";
