@@ -4,6 +4,7 @@ export const MAX_COMPARABLE_GAP_MIN = 120;
 
 export type IndoorComparison =
   | { status: "no_indoor" }
+  | { status: "unknown_time"; indoorPm25: number }
   | { status: "no_outdoor_pm25"; indoorPm25: number }
   | { status: "not_comparable"; indoorPm25: number; outdoorPm25: number; gapMinutes: number }
   | {
@@ -27,9 +28,16 @@ export function compareIndoorOutdoor(
   const indoorPm25 = profile.indoorPm25;
   const outdoorPm25 = air?.pollutants.pm25 ?? null;
   if (!air || outdoorPm25 === null) return { status: "no_outdoor_pm25", indoorPm25 };
-  const indoorAt = now.getTime() - (profile.indoorReadingAgeMinutes ?? 0) * 60000;
-  const gapMinutes = Math.round(Math.abs(indoorAt - new Date(air.measuredAt).getTime()) / 60000);
-  if (gapMinutes > MAX_COMPARABLE_GAP_MIN)
+  const indoorAt = profile.indoorMeasuredAt
+    ? Date.parse(profile.indoorMeasuredAt)
+    : profile.indoorReadingAgeMinutes === null
+      ? NaN
+      : now.getTime() - profile.indoorReadingAgeMinutes * 60000;
+  const gapMs = Math.abs(indoorAt - Date.parse(air.measuredAt));
+  if (!Number.isFinite(gapMs) || indoorAt > now.getTime())
+    return { status: "unknown_time", indoorPm25 };
+  const gapMinutes = Math.round(gapMs / 60000);
+  if (gapMs > MAX_COMPARABLE_GAP_MIN * 60000)
     return { status: "not_comparable", indoorPm25, outdoorPm25, gapMinutes };
   return {
     status: "comparable",

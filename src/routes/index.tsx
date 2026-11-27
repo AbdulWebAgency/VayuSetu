@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bot, ListChecks, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
@@ -50,6 +50,14 @@ function Index() {
   const [loading, setLoading] = useState(false);
   const [scenario, setScenario] = useState<string | null>(null);
   const [status, setStatus] = useState("");
+  const [, setClock] = useState(() => new Date());
+  useEffect(() => {
+    if (!air) return;
+    const timer = setInterval(() => setClock(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, [air]);
+  const [appliedProfile, setAppliedProfile] = useState<HouseholdProfile | null>(null);
+  const [needsUpdate, setNeedsUpdate] = useState(false);
   const reqId = useRef(0);
 
   const run = useCallback(async (loc: ResolvedLocation, prof: HouseholdProfile) => {
@@ -59,6 +67,8 @@ function Index() {
     try {
       const r = await fetchAdvisory(loc, prof);
       if (id !== reqId.current) return;
+      setAppliedProfile(prof);
+      setNeedsUpdate(false);
       setAir(r.air);
       setAdvisory(r.advisory);
       setStatus(
@@ -80,6 +90,8 @@ function Index() {
       if (id !== reqId.current) return;
       const fallbackReason =
         e instanceof ApiError && e.status === 429 ? e.message : "Advisory service unavailable";
+      setAppliedProfile(prof);
+      setNeedsUpdate(false);
       setAir(a);
       setAdvisory(
         runRuleEngine(
@@ -98,6 +110,8 @@ function Index() {
   const confirmLocation = (l: ResolvedLocation) => {
     setScenario(null);
     setLocation(l);
+    setAppliedProfile(null);
+    setNeedsUpdate(false);
     setAir(null);
     setAdvisory(null);
     void run(l, profile);
@@ -107,6 +121,8 @@ function Index() {
     setScenario(s.id);
     setProfile(s.profile);
     setLocation(city);
+    setAppliedProfile(null);
+    setNeedsUpdate(false);
     setAir(null);
     setAdvisory(null);
     void run(city, s.profile);
@@ -135,6 +151,12 @@ function Index() {
             profile={profile}
             onChange={(p) => {
               setScenario(null);
+              if (JSON.stringify(p) === JSON.stringify(profile)) return;
+              ++reqId.current;
+              setLoading(false);
+              const changed = !!location && JSON.stringify(p) !== JSON.stringify(appliedProfile);
+              setNeedsUpdate(changed);
+              setStatus(changed ? "Household changed. Select Update my guidance." : "");
               setProfile(p);
             }}
           />
@@ -156,6 +178,15 @@ function Index() {
               profile={profile}
             />
           </ErrorBoundary>
+          {needsUpdate && (
+            <p className="card-surface p-4 text-sm">
+              Household details changed.{" "}
+              {advisory
+                ? "The displayed plan uses your previous inputs."
+                : "Your current inputs need a new plan."}{" "}
+              Select Update my guidance.
+            </p>
+          )}
           {advisory && (
             <ErrorBoundary label="Recommendations">
               <p
@@ -167,9 +198,11 @@ function Index() {
                 ) : (
                   <ListChecks className="h-4 w-4" aria-hidden />
                 )}
-                {advisory.mode === "ai_enriched"
-                  ? "AI-Enriched Guidance Active"
-                  : "Rule-Based Guidance Active"}
+                {needsUpdate
+                  ? "Previous guidance"
+                  : advisory.mode === "ai_enriched"
+                    ? "AI-Enriched Guidance Active"
+                    : "Rule-Based Guidance Active"}
                 <span className="font-normal">· {advisory.modeReason}</span>
               </p>
               {!advisory.liveDataAvailable && (

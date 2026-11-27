@@ -2,8 +2,8 @@ import { Building2, Clock, Radio, Satellite, WifiOff } from "lucide-react";
 import type { AirQualityResponse, HouseholdProfile, Pollutants } from "@/types/airQuality";
 import { AQI_SCALE_LABEL } from "@/domain/catalogues";
 import { ageMinutes, computeFreshness } from "@/domain/freshness";
-import { compareIndoorOutdoor } from "@/domain/indoorComparison";
-import { pm25Band } from "@/domain/ruleEngine";
+import type { compareIndoorOutdoor } from "@/domain/indoorComparison";
+import { buildContext, pm25Band } from "@/domain/ruleEngine";
 import { SeverityBadge } from "@/components/common/SeverityBadge";
 
 const FRESH = { live: "Live", aging: "Aging", stale: "Stale" } as const;
@@ -46,8 +46,15 @@ export function AirQualityOverview({
         <p>Fetching verified outdoor data for {locationName}…</p>
       </section>
     );
+  if (!air)
+    return (
+      <section className="card-surface p-5">
+        Select Update my guidance to load the outdoor observation.
+      </section>
+    );
   const data = air?.status === "ok" ? air.data : null;
-  const indoor = compareIndoorOutdoor(profile, data, now);
+  const context = buildContext(data, profile, now);
+  const indoor = context.indoor;
   return (
     <section aria-labelledby="aq-h" className="space-y-4">
       <div className="card-surface p-5 space-y-4">
@@ -81,6 +88,15 @@ export function AirQualityOverview({
           </div>
         ) : (
           <>
+            <p className="text-sm" role="status">
+              {!context.usable
+                ? "This observation cannot support current guidance. Update your guidance for a new reading."
+                : context.outdoorCondition === "high"
+                  ? "Elevated outdoor indicators support the current precautions."
+                  : context.outdoorCondition === "lower"
+                    ? "Available outdoor indicators are below the high category. Recheck before a later outing."
+                    : "A current observation is available, but it lacks AQI and PM2.5 for activity and ventilation decisions."}
+            </p>
             <div className="flex flex-wrap items-center gap-6">
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">AQI</p>
@@ -111,8 +127,10 @@ export function AirQualityOverview({
                 return (
                   <p className="inline-flex items-center gap-1 text-sm" data-testid="freshness">
                     <Clock className="h-4 w-4" aria-hidden />
-                    <strong>{FRESH[freshness]}</strong> · measured{" "}
-                    {ageMinutes(data.measuredAt, now)} min ago
+                    <strong>{FRESH[freshness]}</strong> ·{" "}
+                    {Date.parse(data.measuredAt) > now.getTime()
+                      ? "provider time is ahead of the current clock"
+                      : `measured ${ageMinutes(data.measuredAt, now)} min ago`}
                   </p>
                 );
               })()}
@@ -202,6 +220,9 @@ function IndoorCard({ indoor }: { indoor: ReturnType<typeof compareIndoorOutdoor
               {indoor.indoorHigher ? "higher, suggesting an indoor source" : "lower or equal"}.
             </p>
           )}
+          {indoor.status === "unknown_time" && (
+            <p>Enter the age of your sensor reading to compare measurement times.</p>
+          )}
           {indoor.status === "not_comparable" && (
             <p className="text-muted-foreground">
               Timestamps are {indoor.gapMinutes} minutes apart (over 2 hours), so they are not
@@ -210,7 +231,7 @@ function IndoorCard({ indoor }: { indoor: ReturnType<typeof compareIndoorOutdoor
           )}
           {indoor.status === "no_outdoor_pm25" && (
             <p className="text-muted-foreground">
-              No outdoor PM2.5 concentration is available to compare against.
+              No current outdoor PM2.5 concentration is available to compare against.
             </p>
           )}
         </div>

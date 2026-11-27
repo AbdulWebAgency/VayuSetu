@@ -162,13 +162,19 @@ export function HouseholdProfileForm({ profile: p, onChange }: Props) {
             onChange({
               ...p,
               hasIndoorSensor: v,
-              ...(v ? {} : { indoorPm25: null, indoorReadingAgeMinutes: null }),
+              ...(v
+                ? {}
+                : { indoorPm25: null, indoorReadingAgeMinutes: null, indoorMeasuredAt: undefined }),
             })
           }
         />
       </fieldset>
       {p.hasIndoorSensor && (
         <div className="grid gap-3 sm:grid-cols-2">
+          <p className="text-sm text-muted-foreground sm:col-span-2">
+            Age is recorded at entry. Enter the value and age for the same reading. Sensor readings
+            clear when you reload.
+          </p>
           <div>
             <Label htmlFor="hh-indoor">User-Reported Indoor PM2.5 (µg/m³)</Label>
             <Input
@@ -196,12 +202,16 @@ export function HouseholdProfileForm({ profile: p, onChange }: Props) {
               value={p.indoorReadingAgeMinutes ?? ""}
               onChange={(e) => {
                 const parsedValue = parseOptionalNumber(e.target.value);
-                set(
-                  "indoorReadingAgeMinutes",
+                const age =
                   parsedValue === null
                     ? null
-                    : Math.min(1440, Math.max(0, Math.round(parsedValue))),
-                );
+                    : Math.min(1440, Math.max(0, Math.round(parsedValue)));
+                onChange({
+                  ...p,
+                  indoorReadingAgeMinutes: age,
+                  indoorMeasuredAt:
+                    age === null ? undefined : new Date(Date.now() - age * 60000).toISOString(),
+                });
               }}
             />
           </div>

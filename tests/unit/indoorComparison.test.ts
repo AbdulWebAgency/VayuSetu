@@ -37,3 +37,22 @@ describe("indoor comparison", () => {
     expect(r.status).toBe("no_outdoor_pm25");
   });
 });
+
+it("uses the absolute observation time and compares milliseconds before rounding", () => {
+  const outdoor = air({ measuredAt: NOW.toISOString() });
+  for (const [gap, expected] of [
+    [7200000, "comparable"],
+    [7200001, "not_comparable"],
+  ] as const) {
+    const p = profile({
+      hasIndoorSensor: true,
+      indoorPm25: 45,
+      indoorReadingAgeMinutes: 0,
+      indoorMeasuredAt: new Date(NOW.getTime() - gap).toISOString(),
+    });
+    expect(compareIndoorOutdoor(p, outdoor, NOW).status).toBe(expected);
+  }
+  expect(
+    compareIndoorOutdoor(profile({ hasIndoorSensor: true, indoorPm25: 45 }), outdoor, NOW).status,
+  ).toBe("unknown_time");
+});

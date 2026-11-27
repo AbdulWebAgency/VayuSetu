@@ -120,6 +120,7 @@ export const HouseholdProfileSchema = z.object({
   hasAirPurifier: z.boolean(),
   hasIndoorSensor: z.boolean(),
   indoorPm25: z.number().min(0).max(1500).nullable().describe("User-Reported Indoor PM2.5 µg/m³"),
+  indoorMeasuredAt: z.string().datetime().optional(),
   indoorReadingAgeMinutes: z.number().int().min(0).max(1440).nullable(),
 });
 export type HouseholdProfile = z.infer<typeof HouseholdProfileSchema>;

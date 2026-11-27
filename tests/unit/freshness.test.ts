@@ -18,3 +18,11 @@ describe("freshness", () => {
     expect(computeFreshness(ago(240), "model_estimate", NOW)).toBe("stale");
   });
 });
+
+it.each(["ground_station", "model_estimate"] as const)(
+  "requires the %s observation time to have arrived",
+  (type) => {
+    expect(computeFreshness(new Date(NOW.getTime() + 1).toISOString(), type, NOW)).toBe("stale");
+    expect(computeFreshness(NOW.toISOString(), type, NOW)).toBe("live");
+  },
+);

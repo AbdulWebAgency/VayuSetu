@@ -12,7 +12,7 @@ export function computeFreshness(
   now: Date = new Date(),
 ): Freshness {
   const ageMin = (now.getTime() - new Date(measuredAt).getTime()) / 60000;
-  if (!Number.isFinite(ageMin)) return "stale";
+  if (!Number.isFinite(ageMin) || ageMin < 0) return "stale";
   if (measurementType === "ground_station") {
     if (ageMin <= 90) return "live";
     if (ageMin <= 180) return "aging";

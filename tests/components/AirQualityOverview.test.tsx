@@ -80,3 +80,25 @@ describe("AirQualityOverview", () => {
     expect(screen.getByText(/comparable time/)).toBeInTheDocument();
   });
 });
+
+it.each([
+  [180, /elevated outdoor/i],
+  [30, /below the high category/i],
+  [null, /lacks AQI and PM2.5/i],
+] as const)("announces the decision evidence for PM2.5 %s", (pm25, label) => {
+  const source = air();
+  render(
+    <AirQualityOverview
+      air={{
+        status: "ok",
+        data: { ...source, aqi: null, pollutants: { ...source.pollutants, pm25 } },
+        attempted: [],
+      }}
+      loading={false}
+      locationName="Delhi"
+      profile={profile()}
+      now={NOW}
+    />,
+  );
+  expect(screen.getByRole("status")).toHaveTextContent(label);
+});
